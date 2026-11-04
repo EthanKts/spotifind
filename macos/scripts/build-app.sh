@@ -1,6 +1,9 @@
 #!/bin/bash
 # Builds Spotifind.app (web UI + bundled Node server + native Swift shell) and installs it into ~/Applications.
+#   --no-install   only build macos/build/Spotifind.app (used by package-share.sh); leaves your installed copy alone
 set -euo pipefail
+INSTALL=1
+[ "${1:-}" = "--no-install" ] && INSTALL=0
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MAC="$ROOT/macos"
 BUILD="$MAC/build"
@@ -40,6 +43,11 @@ cp "$BUILD/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp -L "$HOME/.local/node/bin/node" "$APP/Contents/Resources/node"
 ditto "$STAGE" "$APP/Contents/Resources/server"
 codesign --force --deep --sign - "$APP"
+
+if [ "$INSTALL" = 0 ]; then
+  echo "Built: $APP"
+  exit 0
+fi
 
 echo "==> Settings"
 SUPPORT="$HOME/Library/Application Support/Spotifind"

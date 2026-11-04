@@ -1,8 +1,8 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { configValue, setConfigValue, SUPPORT_DIR } from "./config";
 import { mapLimit } from "./http";
 import { norm } from "../util";
 
@@ -11,8 +11,6 @@ import { norm } from "../util";
 // Endpoints follow Spotify's February 2026 Web API changes:
 //   POST /me/playlists (create) · POST/PUT /playlists/{id}/items (add/replace) · search limit ≤ 10.
 
-const SUPPORT_DIR = process.env.SPOTIFIND_SUPPORT_DIR || join(homedir(), "Library", "Application Support", "Spotifind");
-const CONFIG_FILE = join(SUPPORT_DIR, "config.env");
 const AUTH_FILE = join(SUPPORT_DIR, "spotify-auth.json");
 const SCOPES = ["playlist-modify-private", "playlist-modify-public"];
 const API = "https://api.spotify.com/v1";
@@ -27,31 +25,13 @@ interface Auth {
 
 // ------------------------------------------------------------------ config (Client ID)
 
-function readConfigFile(): Record<string, string> {
-  try {
-    const out: Record<string, string> = {};
-    for (const line of readFileSync(CONFIG_FILE, "utf8").split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z_]+)\s*=\s*"?([^"]*)"?\s*$/);
-      if (m && m[2]) out[m[1]] = m[2];
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
 export function clientId(): string | undefined {
-  return process.env.SPOTIFY_CLIENT_ID || readConfigFile().SPOTIFY_CLIENT_ID || undefined;
+  return configValue("SPOTIFY_CLIENT_ID");
 }
 
 /** Save the Client ID to config.env (and use it immediately, no restart). */
 export function setClientId(id: string) {
-  mkdirSync(SUPPORT_DIR, { recursive: true });
-  let text = existsSync(CONFIG_FILE) ? readFileSync(CONFIG_FILE, "utf8") : "# Spotifind settings\n";
-  if (/^\s*SPOTIFY_CLIENT_ID\s*=.*$/m.test(text)) text = text.replace(/^\s*SPOTIFY_CLIENT_ID\s*=.*$/m, `SPOTIFY_CLIENT_ID=${id}`);
-  else text = text.replace(/\n?$/, `\nSPOTIFY_CLIENT_ID=${id}\n`);
-  writeFileSync(CONFIG_FILE, text, { mode: 0o600 });
-  process.env.SPOTIFY_CLIENT_ID = id;
+  setConfigValue("SPOTIFY_CLIENT_ID", id);
   // A different app means the old login is no longer valid.
   disconnect();
 }

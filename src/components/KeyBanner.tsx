@@ -11,8 +11,18 @@ export function KeyBanner() {
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-danger" />
       <p className="text-sub">
         <span className="font-semibold text-ink">Limited mode — no Last.fm key.</span> Recommendations fall back to Deezer&apos;s related-artist graph:
-        no similarity scores, and Same Groove / Same Mood are unavailable. Add <code className="text-ink">LASTFM_API_KEY</code> to{" "}
-        <code className="text-ink">.env.local</code> and restart.
+        no similarity scores, and Same Groove / Same Mood are unavailable. <button
+          onClick={() => {
+            try {
+              sessionStorage.removeItem("spotifind:skipSetup");
+            } catch {}
+            window.location.reload();
+          }}
+          className="font-semibold text-ink underline"
+        >
+          Add your Last.fm key
+        </button>{" "}
+        to unlock them.
       </p>
     </div>
   );

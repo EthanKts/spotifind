@@ -6,6 +6,7 @@ import { Sidebar, MobileNav } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { Player } from "@/components/Player";
 import { KeyBanner } from "@/components/KeyBanner";
+import { Welcome } from "@/components/Welcome";
 
 const figtree = Figtree({ variable: "--font-figtree", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <MobileNav />
           </Suspense>
         </div>
+        <Welcome />
       </body>
     </html>
   );

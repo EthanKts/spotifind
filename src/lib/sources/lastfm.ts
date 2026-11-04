@@ -1,19 +1,24 @@
 import "server-only";
 import { fetchJson } from "./http";
+import { configValue } from "./config";
 import type { TagVector } from "../types";
 import { norm } from "../util";
 
 const BASE = "https://ws.audioscrobbler.com/2.0/";
 const PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f";
 
+export function lastfmKey() {
+  return configValue("LASTFM_API_KEY");
+}
+
 export function hasLastfm() {
-  return !!process.env.LASTFM_API_KEY;
+  return !!lastfmKey();
 }
 
 type LfImage = { "#text": string; size: string }[];
 
 async function call<T>(method: string, params: Record<string, string | number | undefined>, ttlSec?: number): Promise<T> {
-  const key = process.env.LASTFM_API_KEY;
+  const key = lastfmKey();
   if (!key) throw new Error("LASTFM_API_KEY missing");
   const p = new URLSearchParams({ method, api_key: key, format: "json", autocorrect: "1" });
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") p.set(k, String(v));

@@ -68,3 +68,9 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 ## Playlist length (round 5)
 - [x] Choose playlist length (10–50 songs)
 - [x] Rebuild app and test
+
+## Share with friends (round 6)
+- [x] Commit work to git
+- [x] First-launch screen for each person's Last.fm key
+- [x] Shareable .dmg / .zip with setup guide, no keys inside
+- [ ] Private GitHub repo

@@ -22,6 +22,14 @@ bash macos/scripts/build-app.sh
 
 The script builds the Next.js standalone server, the Swift shell (`macos/Sources`) and the icon, bundles Node from `~/.local/node`, then installs the app. Only Command Line Tools are needed, not Xcode.
 
+## Share with friends
+
+```sh
+bash macos/scripts/package-share.sh
+```
+
+Creates `macos/dist/Spotifind.dmg` and `Spotifind.zip` (app + **How to set up Spotifind.html**). The script refuses to package if any of your keys are found inside the app. Each friend gets a **first-launch screen** asking for their own free Last.fm API key (checked with Last.fm before saving), and connects their own Spotify from the "Save to Spotify" dialog. Requirements for friends: Apple silicon Mac, macOS 14+. The app is ad-hoc signed (no paid Apple Developer ID), so the first launch needs **System Settings → Privacy & Security → Open Anyway** — the guide explains it.
+
 ## Run in a browser (development)
 
 ```sh
