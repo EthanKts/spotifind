@@ -73,4 +73,4 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] Commit work to git
 - [x] First-launch screen for each person's Last.fm key
 - [x] Shareable .dmg / .zip with setup guide, no keys inside
-- [ ] Private GitHub repo
+- [x] Private GitHub repo
