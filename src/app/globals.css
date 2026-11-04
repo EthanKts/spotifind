@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
+@theme {
+  --color-void: #000000;
+  --color-base: #121212;
+  --color-elev: #181818;
+  --color-elev-2: #1f1f1f;
+  --color-hl: #2a2a2a;
+  --color-hl-2: #333333;
+  --color-line: #2f2f2f;
+  --color-ink: #ffffff;
+  --color-sub: #b3b3b3;
+  --color-mute: #7a7a7a;
+  /* Spotify green everywhere. "find" (discovery accents) is the same green, kept as its own token. */
+  --color-brand: #1ed760;
+  --color-brand-hi: #3be477;
+  --color-brand-deep: #169c46;
+  --color-find: #1ed760;
+  --color-danger: #f3727f;
+
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-rise: rise 0.3s ease-out both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--color-void);
+  color: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin, Spotify-like overlay scrollbars */
+.scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Range inputs (progress, volume, adventurousness) */
+input[type="range"].sf-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--range-fill, var(--color-ink)) 0%,
+    var(--range-fill, var(--color-ink)) var(--range-pct, 0%),
+    rgb(255 255 255 / 0.3) var(--range-pct, 0%)
+  );
+  cursor: pointer;
+  outline: none;
+}
+input[type="range"].sf-range:hover {
+  --range-fill: var(--color-brand);
+}
+input[type="range"].sf-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+input[type="range"].sf-range:hover::-webkit-slider-thumb,
+input[type="range"].sf-range:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+input[type="range"].sf-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+}
+input[type="range"].sf-range.always-thumb::-webkit-slider-thumb {
+  opacity: 1;
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-find);
+  outline-offset: 2px;
 }
