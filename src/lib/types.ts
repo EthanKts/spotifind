@@ -20,6 +20,8 @@ export interface BaseItem {
   deezerId?: number;
   hasPreview?: boolean;
   durationSec?: number;
+  /** See Enrichment.onSpotify. */
+  onSpotify?: boolean;
 }
 
 export type Item = BaseItem;
@@ -69,6 +71,9 @@ export interface RecommendResponse {
 
 export interface Enrichment {
   image?: string;
+  /** true: confirmed on Spotify · false: Spotify doesn't have it · undefined: couldn't check (no Spotify login/key). */
+  onSpotify?: boolean;
+  spotifyUrl?: string;
   deezerId?: number;
   hasPreview?: boolean;
   year?: number;
@@ -110,4 +115,24 @@ export interface ArtistDetail {
   albums: Item[];
   related: (Item & { match?: number })[];
   sources: string[];
+}
+
+/** Spotify listening history ("Import my taste from Spotify"). Not star ratings: a weaker, removable taste signal. */
+export type SpotifyRange = "long_term" | "medium_term" | "short_term";
+
+export interface ImportedItem extends BaseItem {
+  /** 0..1 strength relative to a 4★ rating (time range × chart position). */
+  weight: number;
+  /** Which of your Spotify top lists it was in. */
+  ranges: SpotifyRange[];
+  /** Last.fm tags (artist tags when a song has too few). */
+  tags: TagVector;
+}
+
+export interface SpotifyImport {
+  importedAt: number;
+  user?: string;
+  items: ImportedItem[];
+  /** Keys you removed one by one; a re-import keeps them out. */
+  removed: string[];
 }

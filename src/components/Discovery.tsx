@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Info, Loader2, Sparkles, ListMusic } from "lucide-react";
+import { Info, Loader2, ListMusic, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Candidate, Item, Kind, RecommendResponse } from "@/lib/types";
 import { MODES, rank, type Mode, type Ranked } from "@/lib/recommend/score";
 import { displayScore, explain } from "@/lib/recommend/explain";
 import { GROOVE, MOOD } from "@/lib/recommend/tags";
 import { useTasteInput, taste } from "@/lib/taste/profile";
-import { hoverPrefetch, recommendUrl, useEnriched, useJson, useYear } from "@/lib/client/data";
+import { hoverPrefetch, playableOnSpotify, recommendUrl, useEnriched, useJson, useYear } from "@/lib/client/data";
 import { hrefFor } from "@/lib/util";
 import { Artwork } from "./Artwork";
 import { ArtistLine, ExploreButton, OpenInSpotify, PlayButton, Rating } from "./Actions";
@@ -46,11 +46,15 @@ export function useRanked(
   const ranked = useMemo(() => {
     if (!data) return [];
     const pool = exclude ? data.candidates.filter((c) => !exclude.has(c.key)) : data.candidates;
-    return rank(pool, data.seed, mode, adventure, t, { kind, limit, perArtist });
+    // A few spares, so dropping songs/albums that aren't on Spotify doesn't leave gaps.
+    return rank(pool, data.seed, mode, adventure, t, { kind, limit: limit ? limit + 8 : undefined, perArtist });
   }, [data, mode, adventure, t, kind, limit, perArtist, exclude]);
   const base = useMemo(() => ranked.map((r) => r.c as Item), [ranked]);
-  const items = useEnriched(base);
-  return { ranked, items };
+  const enriched = useEnriched(base);
+  return useMemo(() => {
+    const keep = enriched.map((it, i) => [it, ranked[i]] as const).filter(([it]) => playableOnSpotify(it)).slice(0, limit ?? Infinity);
+    return { ranked: keep.map(([, r]) => r), items: keep.map(([it]) => it) };
+  }, [enriched, ranked, limit]);
 }
 
 // ------------------------------------------------------------------ discovery panel
@@ -78,16 +82,14 @@ export function DiscoveryPanel({
 }) {
   const pct = Math.round(adventure * 100);
   return (
-    <div className="mx-4 rounded-xl border border-find/20 bg-gradient-to-br from-find/[0.08] via-elev to-elev p-4 md:mx-6 md:p-5">
+    <div className="panel mx-4 p-4 md:mx-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-find">
-          <Sparkles className="size-4" /> Discovery controls
-        </h2>
+        <h2 className="label">Style</h2>
         <details className="group relative">
-          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-sub hover:text-ink">
+          <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-sub hover:text-ink">
             <Info className="size-3.5" /> How matching works
           </summary>
-          <div className="absolute right-0 z-40 mt-2 w-[min(88vw,380px)] rounded-lg border border-line bg-elev-2 p-4 text-sm text-sub shadow-2xl">
+          <div className="absolute right-0 z-40 mt-2 w-[min(88vw,380px)] rounded-lg border border-line bg-elev-2 p-4 text-sm text-sub shadow-lg">
             <p className="text-ink font-semibold">Real data only</p>
             <p className="mt-1">
               Candidates come from {sources?.length ? sources.join(", ") : "Last.fm and Deezer"}. Percentages are Last.fm&apos;s own similarity scores — Spotifind
@@ -104,7 +106,7 @@ export function DiscoveryPanel({
         </details>
       </div>
 
-      <div className="no-scrollbar -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1" role="radiogroup" aria-label="Discovery mode">
+      <div className="no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1" role="radiogroup" aria-label="Discovery mode">
         {MODES.map((m) => {
           const on = m.id === mode;
           const unavailable = tagless && (m.id === "groove" || m.id === "mood");
@@ -116,23 +118,21 @@ export function DiscoveryPanel({
               title={unavailable ? "Needs Last.fm tags" : m.hint}
               disabled={unavailable}
               onClick={() => setMode(m.id)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 ${
-                on ? "bg-find text-black shadow-[0_0_0_4px_rgb(30_215_96/0.15)]" : "bg-hl text-ink hover:bg-hl-2"
-              }`}
+              className="option shrink-0 px-3 py-1.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {m.label}
             </button>
           );
         })}
       </div>
-      <p className="mt-1 text-xs text-sub">{MODES.find((m) => m.id === mode)?.hint}</p>
+      <p className="mt-1.5 text-xs text-mute">{MODES.find((m) => m.id === mode)?.hint}</p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
         <label className="block">
-          <div className="flex justify-between text-xs font-semibold text-sub">
-            <span>Very Similar</span>
+          <div className="flex justify-between text-xs text-sub">
+            <span>Very similar</span>
             <span className="text-ink tabular-nums">{pct < 34 ? "Close" : pct < 67 ? "Balanced" : "Adventurous"} · {pct}</span>
-            <span>More Adventurous</span>
+            <span>More adventurous</span>
           </div>
           <input
             type="range"
@@ -145,14 +145,14 @@ export function DiscoveryPanel({
             style={{ ["--range-pct" as string]: `${pct}%`, ["--range-fill" as string]: "var(--color-find)" }}
           />
         </label>
-        <div className="flex gap-1 rounded-full bg-hl p-1" role="tablist" aria-label="Result type">
+        <div className="flex gap-0.5 rounded-md border border-line bg-base p-0.5" role="tablist" aria-label="Result type">
           {(["all", "track", "album", "artist"] as const).map((k) => (
             <button
               key={k}
               role="tab"
               aria-selected={kind === k}
               onClick={() => setKind(k)}
-              className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${kind === k ? "bg-ink text-black" : "text-sub hover:text-ink"}`}
+              className={`rounded px-3 py-1 text-xs transition-colors ${kind === k ? "bg-hl text-ink" : "text-sub hover:text-ink"}`}
             >
               {k === "all" ? "All" : k === "track" ? "Songs" : k === "album" ? "Albums" : "Artists"}
             </button>
@@ -171,45 +171,42 @@ export function RecommendationCard({ r, item, queue, seedTitle, mode }: { r: Ran
   const year = useYear(item);
   const href = hrefFor(item.kind, item.artist, item.title);
   return (
-    <article {...hoverPrefetch(item)} className="group relative flex flex-col rounded-xl bg-elev p-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-hl/80 animate-rise">
+    <article {...hoverPrefetch(item)} className="group relative flex flex-col rounded-lg border border-line bg-elev p-2.5 transition-colors hover:border-hl-2">
       <div className="relative">
         <Link href={href} onClick={() => taste.recordDiscovered(item, seedTitle)} aria-label={`Open ${item.title}`}>
-          <Artwork src={item.image} alt={item.title} kind={item.kind} className="aspect-square w-full shadow-[0_8px_24px_rgb(0_0_0/0.5)]" />
+          <Artwork src={item.image} alt={item.title} kind={item.kind} className="aspect-square w-full" />
         </Link>
         {score && (
           <span
             title={score.label}
-            className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-0.5 text-xs font-bold tabular-nums text-brand backdrop-blur"
+            className="absolute left-2 top-2 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-ink"
           >
-            {Math.round(score.value * 100)}%<span className="ml-1 font-medium text-sub">{score.label.startsWith("Artist") ? "artist" : "match"}</span>
+            {Math.round(score.value * 100)}%<span className="ml-1 text-sub">{score.label.startsWith("Artist") ? "artist" : "match"}</span>
           </span>
         )}
         {item.kind === "track" && (
-          <div className="absolute bottom-2 right-2 translate-y-2 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:translate-y-0 max-md:opacity-100">
+          <div className="absolute bottom-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100">
             <PlayButton item={item} queue={queue} />
           </div>
         )}
       </div>
-      <div className="mt-3 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="shrink-0 rounded-sm bg-hl-2 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-sub">
-            {item.kind === "track" ? "Song" : item.kind}
-          </span>
-          {c.hop === 2 && <span className="shrink-0 rounded-sm bg-find/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-find">2 steps</span>}
-          {year && <span className="text-xs text-mute tabular-nums">{year}</span>}
-        </div>
-        <Link href={href} onClick={() => taste.recordDiscovered(item, seedTitle)} className="mt-1 block truncate text-[15px] font-bold hover:underline">
+      <div className="mt-2.5 min-w-0">
+        <p className="text-[11px] capitalize text-mute">
+          {item.kind === "track" ? "Song" : item.kind}
+          {year ? ` · ${year}` : ""}
+          {c.hop === 2 ? " · 2 steps out" : ""}
+        </p>
+        <Link href={href} onClick={() => taste.recordDiscovered(item, seedTitle)} className="mt-0.5 block truncate text-sm font-medium hover:underline">
           {item.title}
         </Link>
-        {item.kind !== "artist" && <ArtistLine name={item.artist} className="text-sm text-sub" />}
-        <p className="mt-2 line-clamp-3 text-[13px] leading-snug text-sub" title={c.tagsFromArtist ? "Tags shown are the artist's overall tags" : undefined}>
+        {item.kind !== "artist" && <ArtistLine name={item.artist} className="text-[13px] text-sub" />}
+        <p className="mt-2 line-clamp-3 text-xs leading-snug text-mute" title={c.tagsFromArtist ? "Tags shown are the artist's overall tags" : undefined}>
           {explain(r)}
         </p>
       </div>
       <div className="mt-auto pt-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-mute">Good match?</p>
-        <div className="-ml-0.5 mt-0.5 flex items-center justify-between gap-1">
-          <Rating item={item} tags={c.tags} ctx={{ seed: seedTitle, mode }} size={18} />
+        <div className="-ml-0.5 flex items-center justify-between gap-1 border-t border-line pt-2">
+          <Rating item={item} tags={c.tags} ctx={{ seed: seedTitle, mode }} size={16} />
           <div className="flex items-center">
             <ExploreButton item={item} compact />
             <OpenInSpotify item={item} compact />
@@ -249,8 +246,8 @@ export function DiscoverView({
   return (
     <section aria-label="Recommendations">
       {heading && (
-        <div className="mb-4 px-4 md:px-6">
-          <h2 className="text-2xl font-bold tracking-tight">
+        <div className="mb-4 px-4 md:px-8">
+          <h2 className="text-lg font-semibold tracking-tight">
             Because you like <span className="text-find">{seedTitle}</span>
           </h2>
           <p className="text-sm text-sub">Matched on how it sounds to listeners — groove, instrumentation, mood and vocal tags — not just genre.</p>
@@ -267,47 +264,53 @@ export function DiscoverView({
         sources={data?.sources}
         tagless={tagless}
       />
-      <div className="mx-4 mt-3 flex justify-end md:mx-6">
+      <div className="mx-4 mt-3 flex flex-wrap justify-end gap-2 md:mx-8">
+        <Link
+          href={`/rapid?${new URLSearchParams({ kind: seed.kind, artist: seed.artist, title: seed.title, mode, adventure: String(adventure) })}`}
+          className="btn btn-secondary"
+        >
+          <Zap className="size-4" /> Rate in Rapid-fire
+        </Link>
         <Link
           href={`/playlists?${new URLSearchParams({ kind: seed.kind, artist: seed.artist, title: seed.title, mode, adventure: String(adventure) })}`}
-          className="flex items-center gap-2 rounded-full bg-find px-4 py-1.5 text-sm font-bold text-black transition-transform hover:scale-105"
+          className="btn btn-primary"
         >
-          <ListMusic className="size-4" /> Make a playlist from this
+          <ListMusic className="size-4" /> Make playlist
         </Link>
       </div>
       <div className="mt-3">
         {refining && (
-          <p className="mx-4 mb-3 flex items-center gap-2 text-xs text-sub md:mx-6">
+          <p className="mx-4 mb-3 flex items-center gap-2 text-xs text-sub md:mx-8">
             <Loader2 className="size-3.5 animate-spin text-find" /> Showing closest matches — refining with tags, deep cuts and your taste…
           </p>
         )}
         {missingCategory && !refining && (
-          <p className="mx-4 mb-3 rounded-lg bg-elev px-3 py-2 text-xs text-sub md:mx-6">
+          <p className="panel mx-4 mb-3 px-3 py-2 text-xs text-sub md:mx-8">
             Last.fm has no {missingCategory === "mood" ? "mood" : "rhythm/instrument"} tags for {seedTitle} ({seedTags.slice(0, 4).join(", ") || "no tags"}), so this mode
             ranks on all shared tags instead.
           </p>
         )}
         {loading && (
           <>
-            <p className="flex items-center gap-2 px-4 text-sm text-sub md:px-6">
+            <p className="flex items-center gap-2 px-4 text-sm text-sub md:px-8">
               <Loader2 className="size-4 animate-spin text-find" />
               Finding music like {seedTitle}…
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 md:px-6 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="mt-2 grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 xl:grid-cols-5">
               {Array.from({ length: 10 }, (_, i) => <CardSkeleton key={i} />)}
             </div>
           </>
         )}
-        {error && <p className="px-4 text-sm text-danger md:px-6">Couldn&apos;t load recommendations: {error}</p>}
+        {error && <p className="px-4 text-sm text-danger md:px-8">Couldn&apos;t load recommendations: {error}</p>}
         {data && ranked.length === 0 && (
-          <p className="px-4 text-sm text-sub md:px-6">
+          <p className="px-4 text-sm text-sub md:px-8">
             {data.candidates.length === 0
               ? (data.limitations[0] ?? "No similarity data found.")
               : "Nothing fits this combination — try another mode, result type, or move the slider."}
           </p>
         )}
         {ranked.length > 0 && (
-          <div key={`${mode}-${kind}`} className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 md:px-6 lg:grid-cols-4 xl:grid-cols-5">
+          <div key={`${mode}-${kind}`} className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 xl:grid-cols-5">
             {ranked.map((r, i) => (
               <RecommendationCard key={r.c.key} r={r} item={items[i]} queue={items.filter((x) => x.kind === "track")} seedTitle={seedTitle} mode={mode} />
             ))}
@@ -315,7 +318,7 @@ export function DiscoverView({
         )}
         {data && ranked.length >= shown && (
           <div className="mt-6 flex justify-center">
-            <button onClick={() => setShown((n) => n + 24)} className="rounded-full border border-mute px-6 py-2 text-sm font-bold hover:border-ink hover:scale-105 transition-transform">
+            <button onClick={() => setShown((n) => n + 24)} className="btn btn-secondary">
               Show more
             </button>
           </div>

@@ -60,19 +60,19 @@ export function ArtistView({ name }: { name: string }) {
         extra={
           <Link
             href={discoverHref("artist", data?.item.artist ?? name, data?.item.title ?? name)}
-            className="flex items-center gap-2 rounded-full bg-find px-4 py-1.5 text-sm font-bold text-black transition-transform hover:scale-105"
+            className="btn btn-primary"
           >
             <Compass className="size-4" /> Discover from this artist
           </Link>
         }
       />
-      {loading && <p className="px-4 text-sub md:px-6">Loading discography and listening data…</p>}
-      {error && <p className="px-4 text-danger md:px-6">Couldn&apos;t load this artist: {error}</p>}
+      {loading && <p className="px-4 text-sub md:px-8">Loading discography and listening data…</p>}
+      {error && <p className="px-4 text-danger md:px-8">Couldn&apos;t load this artist: {error}</p>}
 
       {data && (
         <>
           {Object.keys(data.tags).length > 0 && (
-            <div className="px-4 md:px-6">
+            <div className="px-4 md:px-8">
               <TagChips tags={data.tags} />
             </div>
           )}
@@ -89,7 +89,7 @@ export function ArtistView({ name }: { name: string }) {
                 queue={trackItems}
                 highlight={
                   personal && relevant[i]?.shared.length ? (
-                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-find">
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-sub">
                       <Sparkles className="size-3" /> Matches your love of {relevant[i].shared.join(" & ")}
                     </span>
                   ) : undefined
@@ -98,7 +98,7 @@ export function ArtistView({ name }: { name: string }) {
               />
             ))}
             {trackItems.length > 5 && (
-              <button onClick={() => setShowAll((s) => !s)} className="px-4 py-2 text-sm font-bold text-sub hover:text-ink md:px-6">
+              <button onClick={() => setShowAll((s) => !s)} className="px-4 py-2 text-sm font-bold text-sub hover:text-ink md:px-8">
                 {showAll ? "Show less" : "See more"}
               </button>
             )}
@@ -110,7 +110,7 @@ export function ArtistView({ name }: { name: string }) {
                 <ShelfItem key={a.key}>
                   <MediaCard
                     item={a}
-                    badge={p.ratings[a.key] ? <span className="rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-bold text-find">You rated {p.ratings[a.key].rating}★</span> : undefined}
+                    badge={p.ratings[a.key] ? <span className="rounded bg-black/80 px-1.5 py-0.5 text-[11px] text-ink">You rated {p.ratings[a.key].rating}★</span> : undefined}
                     subtitle={`${a.year ? `${a.year} · ` : ""}${formatCount(a.playcount)} plays`}
                   />
                 </ShelfItem>
@@ -143,8 +143,8 @@ export function ArtistView({ name }: { name: string }) {
           )}
 
           {data.bio && (
-            <section className="mx-4 mt-8 max-w-3xl rounded-xl bg-elev p-5 text-sm leading-relaxed text-sub md:mx-6">
-              <h2 className="mb-2 text-base font-bold text-ink">About</h2>
+            <section className="mx-4 mt-8 max-w-3xl rounded-xl bg-elev p-5 text-sm leading-relaxed text-sub md:mx-8">
+              <h2 className="mb-2 text-sm font-semibold text-ink">About</h2>
               {data.bio}
               {data.item.listeners && <p className="mt-3 font-semibold text-ink">{formatCount(data.item.listeners)} Last.fm listeners</p>}
             </section>

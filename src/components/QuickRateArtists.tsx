@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { X, Zap } from "lucide-react";
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Item } from "@/lib/types";
 import { topRatedArtists, useProfile } from "@/lib/taste/profile";
@@ -18,7 +18,7 @@ type Candidate = { item: Item; why: string };
  * (from songs you rated, music you explored, and artists close to your favourites).
  * Rating one swaps in the next.
  */
-export function QuickRateArtists({ count = 8, title = "Rate artists in seconds" }: { count?: number; title?: string }) {
+export function QuickRateArtists({ count = 8, title = "Rate some artists" }: { count?: number; title?: string }) {
   const p = useProfile();
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
 
@@ -63,13 +63,11 @@ export function QuickRateArtists({ count = 8, title = "Rate artists in seconds" 
   if (!visible.length) return null;
 
   return (
-    <section className="mx-4 mt-6 rounded-xl bg-elev p-4 md:mx-6 md:p-5" aria-label={title}>
+    <section className="mx-4 mt-8 md:mx-8" aria-label={title}>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight">
-            <Zap className="size-5 text-find" /> {title}
-          </h2>
-          <p className="mt-0.5 text-sm text-sub">Rate on the spot — each rating swaps in the next artist and tunes your recommendations.</p>
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <p className="mt-0.5 text-[13px] text-sub">Each rating brings in the next artist.</p>
         </div>
         <span className="hidden text-xs text-mute sm:block">{candidates.length - skipped.size} to go</span>
       </div>
@@ -77,7 +75,7 @@ export function QuickRateArtists({ count = 8, title = "Rate artists in seconds" 
         {visible.map((c, i) => {
           const it = items[i] ?? c.item;
           return (
-            <li key={c.item.key} className="group relative flex flex-col items-center rounded-lg bg-black/25 p-3 text-center animate-rise">
+            <li key={c.item.key} className="group relative flex flex-col items-center rounded-lg border border-line bg-elev p-3 text-center">
               <button
                 onClick={() => setSkipped((s) => new Set(s).add(c.item.key))}
                 aria-label={`Skip ${c.item.title}`}
@@ -87,9 +85,9 @@ export function QuickRateArtists({ count = 8, title = "Rate artists in seconds" 
                 <X className="size-3.5" />
               </button>
               <Link href={artistHref(c.item.artist)} className="w-3/4">
-                <Artwork src={it.image} alt={c.item.title} kind="artist" className="aspect-square w-full transition-transform group-hover:scale-[1.03]" />
+                <Artwork src={it.image} alt={c.item.title} kind="artist" className="aspect-square w-full" />
               </Link>
-              <p className="mt-2 w-full truncate text-sm font-bold">{c.item.title}</p>
+              <p className="mt-2 w-full truncate text-sm font-medium">{c.item.title}</p>
               <p className="line-clamp-2 min-h-[2lh] text-[11px] leading-tight text-mute">{c.why}</p>
               <div className="mt-1.5">
                 <Rating item={c.item} size={16} />

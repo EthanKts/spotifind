@@ -4,6 +4,7 @@ import { ArrowRight, ExternalLink, Loader2 } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { useKeyStatus } from "@/lib/client/data";
 import { LogoMark } from "./Logo";
+import { SpotifyImport } from "./SpotifyImport";
 
 const SKIP_KEY = "spotifind:skipSetup";
 const noop = () => () => {};
@@ -26,6 +27,7 @@ export function Welcome() {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keySaved, setKeySaved] = useState(false);
 
   if (!status || status.lastfm || skipped || skippedStored) return null;
 
@@ -40,7 +42,8 @@ export function Welcome() {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "Couldn't save the key");
-      window.location.reload();
+      setKeySaved(true); // step 2 (optional): import your taste from Spotify
+      setBusy(false);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -49,21 +52,41 @@ export function Welcome() {
 
   return (
     <div className="fixed inset-0 z-[70] overflow-y-auto bg-black" role="dialog" aria-modal="true" aria-label="Welcome to Spotifind">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_20%_0%,rgb(30_215_96/0.18),transparent_60%)]" />
+      
       <div className="relative mx-auto flex min-h-full max-w-xl flex-col justify-center px-6 py-12">
-        <LogoMark size={64} id="sf-g-welcome" />
-        <h1 className="mt-6 text-4xl font-extrabold tracking-tight">Welcome to Spotifind</h1>
-        <p className="mt-2 text-lg text-sub">Spotify is where you listen. Spotifind is where you discover music you’ll love.</p>
+        <LogoMark size={40} id="sf-g-welcome" />
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight">Welcome to Spotifind</h1>
+        <p className="mt-1 text-sub">Find new music based on what you already like.</p>
 
-        <div className="mt-8 rounded-2xl bg-elev p-6">
-          <h2 className="text-lg font-bold">One step first: your free Last.fm API key</h2>
+        {keySaved ? (
+          <div className="panel mt-8 p-5">
+            <p className="text-xs text-mute">Step 2 of 2 · optional</p>
+            <h2 className="mt-1 text-base font-semibold">Start with your Spotify taste</h2>
+            <p className="mt-1 text-sm text-sub">
+              Skip the cold start: import your top artists and songs from Spotify so recommendations fit you from the first click. You can also do this
+              later on My Ratings.
+            </p>
+            <div className="mt-4">
+              <SpotifyImport variant="panel" />
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn btn-primary btn-lg mt-6"
+            >
+              <ArrowRight className="size-4" /> Start discovering
+            </button>
+          </div>
+        ) : (
+        <div className="panel mt-8 p-5">
+          <p className="text-xs text-mute">Step 1 of 2</p>
+          <h2 className="mt-1 text-base font-semibold">Add a free Last.fm API key</h2>
           <p className="mt-1 text-sm text-sub">
             Spotifind’s recommendations come from Last.fm’s listening data. A key is free and takes about two minutes.
           </p>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-sub">
             <li>
               Open{" "}
-              <a href="https://www.last.fm/api/account/create" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-find hover:underline">
+              <a href="https://www.last.fm/api/account/create" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-ink underline underline-offset-2">
                 last.fm/api/account/create <ExternalLink className="size-3" />
               </a>{" "}
               and log in (or sign up for a free Last.fm account).
@@ -89,24 +112,24 @@ export function Welcome() {
               placeholder="Your Last.fm API key"
               aria-label="Last.fm API key"
               spellCheck={false}
-              className="h-12 flex-1 rounded-full bg-black/50 px-5 font-mono text-sm text-ink placeholder:font-sans placeholder:text-mute focus:outline-none focus:ring-2 focus:ring-find"
+              className="input h-10 flex-1 font-mono placeholder:font-sans"
             />
             <button
               disabled={busy || !key.trim()}
-              className="flex h-12 items-center justify-center gap-2 rounded-full bg-find px-6 font-bold text-black transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+              className="btn btn-primary btn-lg"
             >
-              {busy ? <Loader2 className="size-5 animate-spin" /> : <ArrowRight className="size-5" />}
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
               Start discovering
             </button>
           </form>
           {error && <p className="mt-3 text-sm text-danger">{error}</p>}
           <p className="mt-4 text-xs text-mute">
-            The key is saved only on this Mac. Want to save playlists straight to Spotify? You’ll be guided through that the first time you press
-            “Save to Spotify” on a playlist.
+            The key is saved only on this Mac. Next you can import your taste from Spotify (optional).
           </p>
         </div>
+        )}
 
-        <button
+        {!keySaved && <button
           onClick={() => {
             try {
               sessionStorage.setItem(SKIP_KEY, "1");
@@ -116,7 +139,7 @@ export function Welcome() {
           className="mt-6 self-start text-sm text-mute hover:text-sub"
         >
           Skip for now — limited recommendations without similarity scores
-        </button>
+        </button>}
       </div>
     </div>
   );

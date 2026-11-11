@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-void: #000000;
-  --color-base: #121212;
-  --color-elev: #181818;
-  --color-elev-2: #1f1f1f;
-  --color-hl: #2a2a2a;
-  --color-hl-2: #333333;
-  --color-line: #2f2f2f;
-  --color-ink: #ffffff;
-  --color-sub: #b3b3b3;
-  --color-mute: #7a7a7a;
+  /* Neutral greys, one accent. Surfaces step up by small amounts; borders do the separating, not shadows. */
+  --color-void: #0b0b0c;
+  --color-base: #111113;
+  --color-elev: #18181b;
+  --color-elev-2: #1e1e22;
+  --color-hl: #26262b;
+  --color-hl-2: #2f2f35;
+  --color-line: #2a2a2f;
+  --color-ink: #f4f4f5;
+  --color-sub: #a1a1aa;
+  --color-mute: #71717a;
   /* Spotify green everywhere. "find" (discovery accents) is the same green, kept as its own token. */
   --color-brand: #1ed760;
   --color-brand-hi: #3be477;
@@ -18,10 +19,10 @@
   --color-find: #1ed760;
   --color-danger: #f3727f;
 
-  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   --animate-fade-in: fade-in 0.25s ease-out both;
-  --animate-rise: rise 0.3s ease-out both;
+  --animate-rise: rise 0.2s ease-out both;
 }
 
 @keyframes fade-in {
@@ -108,4 +109,49 @@ input[type="range"].sf-range.always-thumb::-webkit-slider-thumb {
 :focus-visible {
   outline: 2px solid var(--color-find);
   outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ shared controls */
+
+@layer components {
+  .btn {
+    @apply inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-find text-black hover:bg-brand-hi;
+  }
+  .btn-secondary {
+    @apply border border-line bg-elev text-ink hover:border-hl-2 hover:bg-hl;
+  }
+  .btn-ghost {
+    @apply text-sub hover:bg-hl hover:text-ink;
+  }
+  .btn-danger {
+    @apply border border-danger/40 text-danger hover:bg-danger/10;
+  }
+  .btn-sm {
+    @apply h-8 px-3 text-[13px];
+  }
+  .btn-lg {
+    @apply h-10 px-4;
+  }
+  /* A bordered surface for groups of controls or content. */
+  .panel {
+    @apply rounded-lg border border-line bg-elev;
+  }
+  /* Small section label inside panels and forms. */
+  .label {
+    @apply text-[13px] font-medium text-sub;
+  }
+  /* Selectable option (radio card / chip). */
+  .option {
+    @apply rounded-md border border-line bg-base text-left transition-colors hover:border-hl-2 hover:bg-hl;
+  }
+  .option[aria-checked="true"],
+  .option[data-on="true"] {
+    @apply border-find bg-find/10;
+  }
+  .input {
+    @apply h-9 rounded-md border border-line bg-base px-3 text-sm text-ink placeholder:text-mute focus:border-sub focus:outline-none;
+  }
 }

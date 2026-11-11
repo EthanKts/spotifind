@@ -74,3 +74,26 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] First-launch screen for each person's Last.fm key
 - [x] Shareable .dmg / .zip with setup guide, no keys inside
 - [x] Private GitHub repo
+
+## Rapid-fire rating (round 7)
+- [x] Rapid-fire page: seed picker, queue from recommendation pipeline
+- [x] One-track view, auto-play preview, keyboard shortcuts
+- [x] Skip unplayable/rated/hidden; refill queue with updated taste
+- [x] Summary + playlist from 4–5★; sidebar entry and ⌘7
+- [x] Test in dev and rebuild the Mac app
+
+## Spotify taste import (round 8)
+- [x] user-top-read scope + reconnect prompt
+- [x] Fetch top artists/tracks, map to Last.fm tags
+- [x] Imported signals in taste profile at lower weight
+- [x] Import UI (connect flow, My Ratings, first launch) + remove
+- [x] Premium / owner-rule error handling
+- [x] Test in dev and rebuild the Mac app
+
+## Accuracy + clean redesign (round 9)
+- [x] Recent Spotify listening weighs most in imports
+- [x] Verify recommendations exist on Spotify; hide the ones that don't
+- [x] Spotify cover art first; fix blank covers and same-name artists
+- [x] Clean visual style (no gradients, glows, scaling, badges)
+- [x] Simpler navigation: one grouped sidebar, tabbed My ratings
+- [x] Rebuild the Mac app and test

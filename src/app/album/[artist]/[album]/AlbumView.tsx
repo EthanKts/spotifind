@@ -61,19 +61,19 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
         extra={
           <Link
             href={discoverHref("album", data?.item.artist ?? artist, data?.item.title ?? title)}
-            className="flex items-center gap-2 rounded-full bg-find px-4 py-1.5 text-sm font-bold text-black transition-transform hover:scale-105"
+            className="btn btn-primary"
           >
             <Compass className="size-4" /> Explore similar
           </Link>
         }
       />
-      {loading && <p className="px-4 text-sub md:px-6">Loading tracklist and listening data…</p>}
-      {error && <p className="px-4 text-danger md:px-6">Couldn&apos;t load this album: {error}</p>}
+      {loading && <p className="px-4 text-sub md:px-8">Loading tracklist and listening data…</p>}
+      {error && <p className="px-4 text-danger md:px-8">Couldn&apos;t load this album: {error}</p>}
 
       {data && (
         <>
           {Object.keys(data.tags).length > 0 && (
-            <div className="px-4 md:px-6">
+            <div className="px-4 md:px-8">
               <TagChips tags={data.tags} />
             </div>
           )}
@@ -92,7 +92,7 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
                 showArt={false}
                 highlight={
                   picks.keys.has(t.key) ? (
-                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-find">
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-sub">
                       <Sparkles className="size-3" /> {picks.personal ? "You'll likely love this" : "Listener favourite"}
                     </span>
                   ) : undefined
@@ -100,7 +100,7 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
                 extra={t.playcount ? <span className="hidden text-xs tabular-nums text-mute lg:inline">{formatCount(t.playcount)} plays</span> : undefined}
               />
             ))}
-            <p className="px-4 pt-3 text-xs text-mute md:px-6">
+            <p className="px-4 pt-3 text-xs text-mute md:px-8">
               {picks.personal
                 ? "Highlights combine your taste-profile tags with each track's Last.fm play count."
                 : "Rate a few songs 4–5★ to get personal highlights — for now these are the most-played tracks on Last.fm."}{" "}
@@ -109,8 +109,8 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
           </section>
 
           {data.wiki && (
-            <section className="mx-4 mt-8 max-w-3xl rounded-xl bg-elev p-5 text-sm leading-relaxed text-sub md:mx-6">
-              <h2 className="mb-2 text-base font-bold text-ink">About this album</h2>
+            <section className="mx-4 mt-8 max-w-3xl rounded-xl bg-elev p-5 text-sm leading-relaxed text-sub md:mx-8">
+              <h2 className="mb-2 text-sm font-semibold text-ink">About this album</h2>
               {data.wiki}
             </section>
           )}
@@ -124,7 +124,7 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
             const s = displayScore(similarAlbums.ranked[i].c);
             return (
               <ShelfItem key={it.key}>
-                <MediaCard item={it} badge={s && <span className="rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-bold text-brand">{Math.round(s.value * 100)}%</span>} />
+                <MediaCard item={it} badge={s && <span className="rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-ink">{Math.round(s.value * 100)}%</span>} />
               </ShelfItem>
             );
           })}
@@ -136,7 +136,7 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
             const s = displayScore(recTracks.ranked[i].c);
             return (
               <ShelfItem key={it.key}>
-                <MediaCard item={it} queue={recTracks.items} badge={s && <span className="rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-bold text-brand">{Math.round(s.value * 100)}%</span>} />
+                <MediaCard item={it} queue={recTracks.items} badge={s && <span className="rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-ink">{Math.round(s.value * 100)}%</span>} />
               </ShelfItem>
             );
           })}

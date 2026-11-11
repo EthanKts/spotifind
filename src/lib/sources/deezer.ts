@@ -11,6 +11,9 @@ async function dz<T>(path: string, ttlSec?: number): Promise<T> {
   return d;
 }
 
+/** Deezer serves a blank image for artists/albums without a picture; treat those as missing. */
+export const realImage = (url?: string) => (url && !/\/images\/(artist|cover)\/\/|\/images\/(artist|cover)\/d41d8cd98f00b204e9800998ecf8427e\//.test(url) ? url : undefined);
+
 export interface DzArtist { id: number; name: string; picture_xl?: string; picture_big?: string; nb_fan?: number }
 export interface DzAlbum {
   id: number;
@@ -121,10 +124,14 @@ export async function findAlbum(artist: string, title: string): Promise<DzAlbum 
   return pickAlbum(await searchAlbums(`${artist} ${title}`, 10), artist, title);
 }
 
+/**
+ * The Deezer artist with this exact name. Several artists often share a name ("Pond": an Australian band with 27k fans,
+ * plus small namesakes listed first), so pick the best-known one rather than the first hit.
+ */
 export async function findArtist(name: string): Promise<DzArtist | undefined> {
-  const res = await searchArtists(name, 5);
+  const res = await searchArtists(name, 10);
   const n = norm(name);
-  return res.find((r) => norm(r.name) === n);
+  return res.filter((r) => norm(r.name) === n).sort((a, b) => (b.nb_fan ?? 0) - (a.nb_fan ?? 0))[0];
 }
 
 export async function album(id: number): Promise<DzAlbum> {

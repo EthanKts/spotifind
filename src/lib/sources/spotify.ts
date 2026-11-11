@@ -143,3 +143,58 @@ export async function oembedTitle(url: string): Promise<string | undefined> {
   const j = (await res.json()) as { title?: string };
   return j.title;
 }
+
+// ------------------------------------------------------------------ catalogue check (is it really on Spotify?)
+
+/** Title without edition noise for comparing catalogues: "(Remastered 2011)", "[Enhanced]", "- Single", "- EP". */
+function relax(s: string) {
+  return norm(s.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, "").replace(/\s+-\s+.*$/, "")) || norm(s);
+}
+/** Field filters break on quotes and apostrophes ("artist:Melody's Echo Chamber" finds nothing). */
+const q = (s: string) => s.replace(/["'’`]/g, "").replace(/\s*[\(\[][^\)\]]*[\)\]]/g, "").replace(/\s+-\s+(single|ep)$/i, "").trim();
+
+function sameTitle(a: string, b: string) {
+  if (norm(a) === norm(b)) return true;
+  const x = relax(a);
+  const y = relax(b);
+  return x === y || (Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x)));
+}
+const hasArtist = (artists: { name: string }[], artist: string) => {
+  const a = norm(artist);
+  return artists.some((x) => norm(x.name) === a);
+};
+
+export interface SpotifyMatch {
+  found: boolean;
+  url?: string;
+  /** Cover (album/track) or photo (artist) from Spotify — the artwork you'd see in Spotify itself. */
+  image?: string;
+  year?: number;
+}
+
+/**
+ * Look an item up in Spotify's catalogue. found=false means Spotify really doesn't have it (two searches, strict
+ * then loose). Throws when Spotify can't be asked (no login, rate limit) so callers can treat it as "unknown".
+ * Searches are cached for a week.
+ */
+export async function spotifyMatch(kind: Kind, artist: string, title: string): Promise<SpotifyMatch> {
+  type R = { tracks?: { items: SpTrack[] }; albums?: { items: SpAlbum[] }; artists?: { items: SpArtist[] } };
+  const search = (query: string) => sp<R>(`/search?type=${kind}&limit=10&q=${encodeURIComponent(query)}`, 7 * 24 * 3600);
+  const pick = (d: R): SpotifyMatch | undefined => {
+    if (kind === "track") {
+      const t = d.tracks?.items.find((x) => x && hasArtist(x.artists, artist) && sameTitle(x.name, title));
+      return t && { found: true, url: t.external_urls.spotify, image: img(t.album.images), year: yr(t.album.release_date) };
+    }
+    if (kind === "album") {
+      const a = d.albums?.items.find((x) => x && hasArtist(x.artists, artist) && sameTitle(x.name, title));
+      return a && { found: true, url: a.external_urls.spotify, image: img(a.images), year: yr(a.release_date) };
+    }
+    const a = d.artists?.items.find((x) => x && norm(x.name) === norm(artist));
+    return a && { found: true, url: a.external_urls.spotify, image: img(a.images) };
+  };
+  const field = kind === "artist" ? `artist:${q(artist)}` : `${kind}:${q(title)} artist:${q(artist)}`;
+  const strict = pick(await search(field));
+  if (strict) return strict;
+  const loose = pick(await search(kind === "artist" ? q(artist) : `${q(title)} ${q(artist)}`));
+  return loose ?? { found: false };
+}

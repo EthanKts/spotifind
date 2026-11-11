@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Compass, Sparkles } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { deriveTaste, hasTaste, useDerivedTaste, useProfile, type Profile } from "@/lib/taste/profile";
-import type { Item, Kind } from "@/lib/types";
+import { deriveTaste, useDerivedTaste, useProfile, type Profile } from "@/lib/taste/profile";
+import type { ImportedItem, Item, Kind } from "@/lib/types";
+import { useImported } from "@/lib/taste/imported";
+import { SpotifyImport } from "@/components/SpotifyImport";
 import type { Mode } from "@/lib/recommend/score";
 import { displayScore } from "@/lib/recommend/explain";
 import { useEnriched, useJson } from "@/lib/client/data";
@@ -29,11 +30,13 @@ function useGreeting() {
 }
 
 /** Pick seeds from what you rated 4–5★ (highest first, then most recent) and what you searched. */
-function pickSeeds(p: Profile) {
-  const positives = Object.values(p.ratings)
+function pickSeeds(p: Profile, imported: ImportedItem[]) {
+  const rated = Object.values(p.ratings)
     .filter((r) => r.rating >= 4)
     .sort((a, b) => b.rating - a.rating || b.at - a.at);
-  const artistAffinity = deriveTaste(p).artists;
+  // Cold start: your strongest imported Spotify favourites stand in until you've rated a few things.
+  const positives = rated.length >= 3 ? rated : [...rated, ...imported.filter((it) => !p.ratings[it.key]).slice(0, 6).map((it) => ({ item: it as Item, rating: 4, at: 0 }))];
+  const artistAffinity = deriveTaste(p, imported).artists;
   const favTrackOrAlbum = positives.find((e) => e.item.kind !== "artist")?.item;
   const second = positives.filter((e) => e.item.kind !== "artist" && e.item.key !== favTrackOrAlbum?.key)[0]?.item;
   const topArtist = Object.entries(artistAffinity).sort((a, b) => b[1] - a[1])[0];
@@ -81,7 +84,7 @@ function RecShelf({
             <MediaCard
               item={it}
               queue={items.filter((x) => x.kind === "track")}
-              badge={s && <span className="rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-bold text-brand backdrop-blur">{Math.round(s.value * 100)}%</span>}
+              badge={s && <span className="rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-ink">{Math.round(s.value * 100)}%</span>}
             />
           </ShelfItem>
         );
@@ -99,33 +102,33 @@ function Onboarding() {
   const p = useProfile();
   const ratedArtists = Object.values(p.ratings).filter((r) => r.item.kind === "artist" && r.rating >= 4).length;
   return (
-    <section className="mx-4 rounded-2xl bg-gradient-to-br from-brand/20 via-elev to-find/10 p-5 md:mx-6 md:p-8">
-      <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-find">
-        <Sparkles className="size-4" /> Set up your taste profile
-      </p>
-      <h2 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">What do you love listening to?</h2>
-      <p className="mt-2 max-w-2xl text-sub">
-        Pick a genre and give a few artists you love 4 or 5 stars — or search any song you love and hit Explore. Every rating sharpens your recommendations.
-      </p>
-      <div className="no-scrollbar -mx-1 mt-5 flex gap-2 overflow-x-auto px-1 pb-1">
+    <section className="panel mx-4 p-5 md:mx-8">
+      <h2 className="text-lg font-semibold tracking-tight">Set up your taste</h2>
+      <p className="mt-1 max-w-2xl text-sm text-sub">Rate a few artists you like, or import your listening from Spotify. Recommendations start once Spotifind knows 3 favourites.</p>
+      <div className="mt-4 border-b border-line pb-5">
+        <SpotifyImport variant="inline" />
+      </div>
+      <p className="label mt-5">Or rate artists by genre</p>
+      <div className="no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {GENRES.map((g) => (
           <button
             key={g}
             onClick={() => setTag(g)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold capitalize transition-colors ${g === tag ? "bg-ink text-black" : "bg-black/40 text-ink hover:bg-black/60"}`}
+            data-on={g === tag}
+            className="option shrink-0 rounded-full px-3 py-1 text-[13px] capitalize"
           >
             {g}
           </button>
         ))}
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      <div className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
         {loading && Array.from({ length: 12 }, (_, i) => <div key={i} className="aspect-square animate-pulse rounded-full bg-hl" />)}
         {artists.map((a) => (
           <div key={a.key} className="group relative flex flex-col items-center text-center">
             <Link href={hrefFor("artist", a.artist, a.title)} className="w-full">
-              <Artwork src={a.image} alt={a.title} kind="artist" className="aspect-square w-full transition-transform group-hover:scale-[1.03]" />
+              <Artwork src={a.image} alt={a.title} kind="artist" className="aspect-square w-full" />
             </Link>
-            <p className="mt-2 w-full truncate text-sm font-semibold">{a.title}</p>
+            <p className="mt-2 w-full truncate text-sm font-medium">{a.title}</p>
             <div className="mt-1">
               <Rating item={a} size={15} />
             </div>
@@ -133,7 +136,7 @@ function Onboarding() {
         ))}
       </div>
       {ratedArtists > 0 && (
-        <p className="mt-4 text-sm text-brand">
+        <p className="mt-4 text-sm text-sub">
           {ratedArtists} artist{ratedArtists > 1 ? "s" : ""} rated 4★+ — rate {Math.max(0, 3 - ratedArtists)} more and your shelves take over.
         </p>
       )}
@@ -143,7 +146,8 @@ function Onboarding() {
 
 export function HomeView() {
   const p = useProfile();
-  const seeds = useMemo(() => pickSeeds(p), [p]);
+  const imp = useImported();
+  const seeds = useMemo(() => pickSeeds(p, imp.items), [p, imp]);
   const recent = useMemo(() => {
     const seen = new Set<string>();
     return [...p.recentlyViewed, ...p.recentlyDiscovered]
@@ -152,25 +156,24 @@ export function HomeView() {
       .map((e) => e.item);
   }, [p]);
   const quick = recent.slice(0, 8);
-  const tasteReady = hasTaste(p);
   const positives = Object.values(p.ratings).filter((r) => r.rating >= 4).length;
-  const showOnboarding = positives < 3; // keep it up until a few favourites are rated
+  const showOnboarding = positives < 3 && !imp.items.length; // keep it up until a few favourites are rated (or Spotify taste imported)
   const hello = useGreeting();
 
   return (
     <div>
-      <div className="bg-gradient-to-b from-brand-deep/30 to-transparent px-4 pb-4 pt-2 md:px-6">
-        <h1 className="text-3xl font-extrabold tracking-tight md:text-[32px]">{hello}</h1>
+      <div className="px-4 pb-4 pt-4 md:px-8">
+        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">{hello}</h1>
         {quick.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
             {quick.map((it) => (
               <Link
                 key={it.key}
                 href={hrefFor(it.kind, it.artist, it.title)}
-                className="group flex items-center gap-3 overflow-hidden rounded-md bg-white/[0.07] pr-2 transition-colors hover:bg-white/[0.16]"
+                className="group flex items-center gap-3 overflow-hidden rounded-md border border-line bg-elev pr-2 transition-colors hover:bg-hl"
               >
-                <Artwork src={it.image} alt={it.title} kind={it.kind} rounded={false} className="size-12 shrink-0 rounded-none md:size-14" />
-                <span className="truncate text-sm font-bold">{it.title}</span>
+                <Artwork src={it.image} alt={it.title} kind={it.kind} rounded={false} className="size-11 shrink-0 rounded-none" />
+                <span className="truncate text-[13px] font-medium">{it.title}</span>
               </Link>
             ))}
           </div>
@@ -178,17 +181,6 @@ export function HomeView() {
       </div>
 
       {showOnboarding && <Onboarding />}
-
-      {tasteReady && !showOnboarding && (
-        <div className="mx-4 mt-2 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-elev px-4 py-3 md:mx-6">
-          <p className="text-sm text-sub">
-            <span className="font-semibold text-ink">Spotifind is for finding, Spotify is for listening.</span> Open any shelf to fine-tune with Discovery controls.
-          </p>
-          <Link href="/discover" className="flex items-center gap-2 rounded-full bg-find px-4 py-1.5 text-sm font-bold text-black transition-transform hover:scale-105">
-            <Compass className="size-4" /> Discover
-          </Link>
-        </div>
-      )}
 
       {!showOnboarding && <QuickRateArtists />}
 

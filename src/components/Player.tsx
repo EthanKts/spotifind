@@ -33,10 +33,10 @@ export function Player() {
   const VolIcon = s.volume === 0 ? VolumeX : s.volume < 0.5 ? Volume1 : Volume2;
 
   return (
-    <footer className="shrink-0 md:h-[76px] md:px-2" aria-label="Player">
+    <footer className="shrink-0 border-t border-line bg-void md:h-[68px] md:px-2" aria-label="Player">
       {/* Mobile mini player */}
       {it && (
-        <div className="mx-2 mb-1 flex items-center gap-3 rounded-md bg-hl-2/95 p-2 md:hidden">
+        <div className="flex items-center gap-3 p-2 md:hidden">
           <Artwork src={it.image} alt={it.title} kind={it.kind} className="size-10 shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{it.title}</p>
@@ -59,10 +59,10 @@ export function Player() {
           {it ? (
             <>
               <Link href={hrefFor(it.kind, it.artist, it.title)} className="shrink-0">
-                <Artwork src={it.image} alt={it.title} kind={it.kind} className="size-14" />
+                <Artwork src={it.image} alt={it.title} kind={it.kind} className="size-11" />
               </Link>
               <div className="min-w-0">
-                <Link href={hrefFor(it.kind, it.artist, it.title)} className="block truncate text-sm font-semibold hover:underline">
+                <Link href={hrefFor(it.kind, it.artist, it.title)} className="block truncate text-sm font-medium hover:underline">
                   {it.title}
                 </Link>
                 <ArtistLine name={it.artist} className="text-xs text-sub" />
@@ -72,7 +72,7 @@ export function Player() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-mute">Pick a song to preview it here</p>
+            <p className="text-[13px] text-mute">Nothing playing</p>
           )}
         </div>
 
@@ -85,9 +85,9 @@ export function Player() {
               onClick={() => player.toggle()}
               disabled={!canControl}
               aria-label={playing ? "Pause" : "Play"}
-              className="grid size-9 place-items-center rounded-full bg-ink text-black transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+              className="grid size-8 place-items-center rounded-full bg-ink text-black disabled:opacity-40"
             >
-              {s.status === "loading" ? <Loader2 className="size-5 animate-spin" /> : playing ? <Pause className="size-5 fill-black" /> : <Play className="size-5 translate-x-px fill-black" />}
+              {s.status === "loading" ? <Loader2 className="size-4 animate-spin" /> : playing ? <Pause className="size-4 fill-black" /> : <Play className="size-4 translate-x-px fill-black" />}
             </button>
             <button onClick={() => player.next()} disabled={!it || s.index >= s.queue.length - 1} aria-label="Next" className="text-sub hover:text-ink disabled:opacity-30">
               <SkipForward className="size-5 fill-current" />
@@ -96,7 +96,7 @@ export function Player() {
           {s.status === "unavailable" && it ? (
             <p className="text-xs text-sub">
               No legal preview available for this {it.kind}.{" "}
-              <a className="font-semibold text-brand hover:underline" href={spotifyOpenHref(it.kind, it.artist, it.title)} target="_blank" rel="noreferrer">
+              <a className="text-ink underline-offset-2 hover:underline" href={spotifyOpenHref(it.kind, it.artist, it.title)} target="_blank" rel="noreferrer">
                 Listen on Spotify
               </a>
             </p>
@@ -111,14 +111,14 @@ export function Player() {
 
         <div className="flex items-center justify-end gap-3">
           {it && canControl && (
-            <span className="hidden rounded-full border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sub xl:inline">30s preview · Deezer</span>
+            <span className="hidden whitespace-nowrap text-[11px] text-mute xl:inline">30s preview</span>
           )}
           {it && (
             <a
               href={spotifyOpenHref(it.kind, it.artist, it.title)}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold text-sub hover:text-ink"
+              className="btn btn-ghost btn-sm"
               title="Open in Spotify"
             >
               <SpotifyGlyph className="size-4" />

@@ -14,7 +14,7 @@ export function discoverHref(kind: Kind, artist: string, title: string) {
   return `/discover?${p}`;
 }
 
-const btn = "grid place-items-center rounded-full transition-all hover:scale-110 active:scale-95";
+const btn = "grid place-items-center rounded-md transition-colors hover:bg-hl";
 
 const LABELS = ["", "Not for me", "Not really", "It's okay", "Really like it", "Love it"];
 
@@ -68,7 +68,7 @@ export function Rating({
               if (timer.current) clearTimeout(timer.current);
               timer.current = setTimeout(() => setFlash(null), 1600);
             }}
-            className="p-0.5 transition-transform hover:scale-125 active:scale-95"
+            className="p-0.5"
           >
             <Star
               style={{ width: size, height: size }}
@@ -130,7 +130,7 @@ export function ExploreButton({ item, compact = false }: { item: Item; compact?:
       className={
         compact
           ? `${btn} p-1.5 text-sub hover:text-find`
-          : "flex items-center gap-2 rounded-full bg-find/15 px-4 py-1.5 text-sm font-bold text-find transition-colors hover:bg-find/25"
+          : "btn btn-secondary"
       }
     >
       <Compass className={compact ? "size-5" : "size-4"} />
@@ -151,7 +151,7 @@ export function OpenInSpotify({ item, compact = false }: { item: Item; compact?:
       className={
         compact
           ? `${btn} p-1.5 text-sub hover:text-ink`
-          : "flex items-center gap-2 rounded-full border border-mute px-4 py-1.5 text-sm font-bold text-ink transition-colors hover:border-ink"
+          : "btn btn-secondary"
       }
     >
       <SpotifyGlyph className={compact ? "size-5" : "size-4"} />
@@ -171,14 +171,14 @@ export function PlayButton({ item, queue, size = "md", className = "" }: { item:
   const playing = current && s.status === "playing";
   const loading = current && s.status === "loading";
   const noPreview = item.kind === "track" && item.hasPreview === false;
-  const dim = size === "lg" ? "size-14" : size === "md" ? "size-12" : "size-9";
-  const icon = size === "lg" ? "size-6" : size === "md" ? "size-5" : "size-4";
+  const dim = size === "lg" ? "size-12" : size === "md" ? "size-10" : "size-9";
+  const icon = size === "lg" ? "size-5" : size === "md" ? "size-4" : "size-4";
   return (
     <button
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); player.play(item, queue); }}
       aria-label={playing ? `Pause ${item.title}` : noPreview ? `${item.title}: no preview, open in Spotify` : `Play preview of ${item.title}`}
       title={noPreview ? "No preview available — use Open in Spotify" : "Play 30s preview"}
-      className={`${dim} grid place-items-center rounded-full bg-brand text-black shadow-[0_8px_16px_rgb(0_0_0/0.4)] transition-all hover:scale-105 hover:bg-brand-hi active:scale-95 ${noPreview ? "opacity-60" : ""} ${className}`}
+      className={`${dim} grid place-items-center rounded-full bg-brand text-black transition-colors hover:bg-brand-hi ${noPreview ? "opacity-60" : ""} ${className}`}
     >
       {loading ? <Loader2 className={`${icon} animate-spin`} /> : playing ? <Pause className={`${icon} fill-black`} /> : <Play className={`${icon} translate-x-px fill-black`} />}
     </button>

@@ -36,10 +36,10 @@ export function LogoMark({ size = 32, className = "", id = "sf-g" }: { size?: nu
 export function Logo({ compact = false, id }: { compact?: boolean; id?: string }) {
   return (
     <span className="flex items-center gap-2 select-none">
-      <LogoMark size={compact ? 28 : 34} id={id} />
+      <LogoMark size={compact ? 24 : 24} id={id} />
       {!compact && (
-        <span className="text-[22px] font-extrabold tracking-tight leading-none">
-          Spoti<span className="bg-gradient-to-r from-brand-hi to-find bg-clip-text text-transparent">find</span>
+        <span className="text-[17px] font-semibold tracking-tight leading-none">
+          Spoti<span className="text-find">find</span>
         </span>
       )}
     </span>

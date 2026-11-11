@@ -31,7 +31,7 @@ export function PlaylistView() {
       <EmptyState
         title="Playlist not found"
         action={
-          <Link href="/playlists" className="rounded-full bg-ink px-6 py-2.5 font-bold text-black">
+          <Link href="/playlists" className="btn btn-primary">
             Make a playlist
           </Link>
         }
@@ -76,10 +76,10 @@ export function PlaylistView() {
 
   return (
     <div>
-      <header className="relative flex flex-col gap-5 bg-gradient-to-b from-brand-deep/40 via-brand-deep/10 to-transparent px-4 pb-6 pt-2 sm:flex-row sm:items-end md:px-6">
-        <PlaylistCover pl={pl} className="mx-auto size-48 shrink-0 shadow-[0_12px_48px_rgb(0_0_0/0.6)] sm:mx-0 md:size-56" />
+      <header className="flex flex-col gap-5 px-4 pb-5 pt-4 sm:flex-row sm:items-end md:px-8">
+        <PlaylistCover pl={pl} className="mx-auto size-36 shrink-0 sm:mx-0 md:size-40" />
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wider text-sub">Spotifind playlist · {modeLabel(pl.settings.mode)}</p>
+          <p className="text-xs text-mute">Playlist · {modeLabel(pl.settings.mode)}</p>
           {editing ? (
             <form
               onSubmit={(e) => {
@@ -95,10 +95,10 @@ export function PlaylistView() {
                 onChange={(e) => setName(e.target.value)}
                 onBlur={(e) => e.currentTarget.form?.requestSubmit()}
                 aria-label="Playlist name"
-                className="w-full max-w-xl rounded-md bg-black/40 px-2 py-1 text-3xl font-extrabold tracking-tight focus:outline-none focus:ring-2 focus:ring-find md:text-5xl"
+                className="input h-auto w-full max-w-xl py-1 text-2xl font-semibold tracking-tight md:text-[28px]"
               />
               <button aria-label="Save name" className="rounded-full p-2 text-find hover:bg-hl">
-                <Check className="size-6" />
+                <Check className="size-5" />
               </button>
             </form>
           ) : (
@@ -110,30 +110,30 @@ export function PlaylistView() {
               className="group mt-1 flex items-center gap-3 text-left"
               title="Rename"
             >
-              <h1 className="line-clamp-2 text-4xl font-extrabold leading-tight tracking-tight md:text-6xl">{pl.name}</h1>
-              <Pencil className="size-5 shrink-0 text-sub opacity-0 transition-opacity group-hover:opacity-100" />
+              <h1 className="line-clamp-2 text-2xl font-semibold leading-tight tracking-tight md:text-[28px]">{pl.name}</h1>
+              <Pencil className="size-4 shrink-0 text-sub opacity-0 transition-opacity group-hover:opacity-100" />
             </button>
           )}
-          <p className="mt-3 text-sm text-sub">
+          <p className="mt-2 text-[13px] text-sub">
             Built from {pl.settings.basis === "taste" ? `your taste (${pl.settings.seeds.map(seedName).join(", ")})` : pl.seedLabel} · {pl.tracks.length}{" "}
             songs{(pl.settings.length ?? 15) > pl.tracks.length ? ` (asked for ${pl.settings.length} — that's all that fit ${modeLabel(pl.settings.mode)})` : ""}
-            {totalSec ? `, about ${Math.round(totalSec / 60)} min` : ""} · Spotify plays full songs, previews here are 30s
+            {totalSec ? `, about ${Math.round(totalSec / 60)} min` : ""}
           </p>
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 px-4 pb-4 md:px-6">
-        {playable[0] && <PlayButton item={playable[0]} queue={playable} size="lg" />}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 pb-4 md:px-8">
+        {playable[0] && <PlayButton item={playable[0]} queue={playable} size="sm" />}
         <SpotifyExport pl={pl} />
         <button
           onClick={regenerate}
           disabled={!!busy}
-          className="flex items-center gap-2 rounded-full border border-mute px-4 py-1.5 text-sm font-bold transition-colors hover:border-ink disabled:opacity-50"
+          className="btn btn-secondary"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           {busy ?? "Regenerate"}
         </button>
-        <button onClick={copy} className="flex items-center gap-2 rounded-full border border-mute px-4 py-1.5 text-sm font-bold transition-colors hover:border-ink">
+        <button onClick={copy} className="btn btn-secondary">
           {copied ? <Check className="size-4 text-find" /> : <ClipboardCopy className="size-4" />}
           {copied ? "Copied" : "Copy song list"}
         </button>
@@ -144,13 +144,13 @@ export function PlaylistView() {
               router.push("/playlists");
             }
           }}
-          className="ml-auto flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold text-sub hover:text-danger"
+          className="btn btn-ghost ml-auto hover:!text-danger"
         >
           <Trash2 className="size-4" /> Delete
         </button>
       </div>
 
-      <div className="mb-1 hidden grid-cols-[auto_minmax(0,1fr)_auto] gap-3 border-b border-line px-6 pb-2 text-xs uppercase tracking-wider text-sub md:mx-2 md:grid">
+      <div className="mb-1 hidden grid-cols-[auto_minmax(0,1fr)_auto] gap-3 border-b border-line px-6 pb-2 text-xs text-mute md:mx-2 md:grid">
         <span className="w-8 text-center">#</span>
         <span>Title · why it&apos;s here</span>
         <span className="pr-2">Rate · Duration</span>
@@ -169,7 +169,7 @@ export function PlaylistView() {
             extra={
               <>
                 {pl.scores[t.key] != null && (
-                  <span className="hidden rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-bold tabular-nums text-find lg:inline" title="Last.fm similarity">
+                  <span className="hidden text-[11px] tabular-nums text-mute lg:inline" title="Last.fm similarity">
                     {Math.round(pl.scores[t.key] * 100)}%
                   </span>
                 )}
@@ -188,11 +188,11 @@ export function PlaylistView() {
         ))}
       </div>
       {pl.spotify && (
-        <p className="px-4 pt-4 text-xs text-mute md:px-6">
+        <p className="px-4 pt-4 text-xs text-mute md:px-8">
           Saved to Spotify {new Date(pl.spotify.exportedAt).toLocaleDateString()} — after swapping or regenerating, press “Update on Spotify” to sync.
         </p>
       )}
-      <p className="px-4 pt-4 text-xs text-mute md:px-6">
+      <p className="px-4 pt-4 text-xs text-mute md:px-8">
         {pl.alternates.length} more songs ready to swap in. Ratings you give here count toward “How good are the recommendations?” for{" "}
         {modeLabel(pl.settings.mode)}. Total {formatDuration(totalSec) || "—"}.
       </p>

@@ -12,7 +12,9 @@ import { norm } from "../util";
 //   POST /me/playlists (create) · POST/PUT /playlists/{id}/items (add/replace) · search limit ≤ 10.
 
 const AUTH_FILE = join(SUPPORT_DIR, "spotify-auth.json");
-const SCOPES = ["playlist-modify-private", "playlist-modify-public"];
+// user-top-read: "Import my taste from Spotify" (top artists + top tracks). Older logins lack it → reconnect.
+export const SCOPES = ["playlist-modify-private", "playlist-modify-public", "user-top-read"];
+export const TOP_READ_SCOPE = "user-top-read";
 const API = "https://api.spotify.com/v1";
 
 interface Auth {
@@ -62,6 +64,11 @@ export function disconnect() {
 
 export function connectedUser() {
   return readAuth()?.user;
+}
+
+/** Scopes the saved login was granted (Spotify returns them space-separated). */
+export function grantedScopes(): string[] {
+  return (readAuth()?.scope ?? "").split(/\s+/).filter(Boolean);
 }
 
 // ------------------------------------------------------------------ PKCE login

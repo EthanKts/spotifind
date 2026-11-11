@@ -43,21 +43,20 @@ export function SeedHeader({
   }, [item.key, item.image]);
 
   return (
-    <header className={`relative px-4 pt-2 md:px-6 ${compact ? "pb-4" : "pb-6"}`}>
-      <div className="pointer-events-none absolute inset-x-0 -top-20 bottom-0 bg-gradient-to-b from-find/20 via-brand-deep/10 to-transparent" />
+    <header className={`relative px-4 pt-4 md:px-8 ${compact ? "pb-5" : "pb-6"}`}>
       <div className={`relative flex gap-5 ${compact ? "flex-row items-center" : "flex-col sm:flex-row sm:items-end"}`}>
         <Artwork
           src={item.image}
           alt={item.title}
           kind={item.kind}
-          className={`shrink-0 shadow-[0_12px_48px_rgb(0_0_0/0.6)] ${compact ? "size-24 md:size-32" : "mx-auto size-48 sm:mx-0 md:size-56"}`}
+          className={`shrink-0 ${compact ? "size-20 md:size-24" : "mx-auto size-44 sm:mx-0 md:size-48"}`}
         />
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wider text-sub">{label ?? (kind === "track" ? "Song" : kind)}</p>
-          <h1 className={`mt-1 line-clamp-2 font-extrabold leading-tight tracking-tight ${compact ? "text-2xl md:text-4xl" : "text-4xl md:text-6xl"}`}>{item.title}</h1>
+          <p className="text-xs text-mute">{label ?? (kind === "track" ? "Song" : kind === "album" ? "Album" : "Artist")}</p>
+          <h1 className={`mt-1 line-clamp-2 font-semibold leading-tight tracking-tight ${compact ? "text-2xl md:text-[28px]" : "text-3xl md:text-4xl"}`}>{item.title}</h1>
           <p className={`${compact ? "mt-1" : "mt-3"} text-sm text-sub`}>
             {kind !== "artist" && (
-              <Link href={artistHref(item.artist)} className="font-bold text-ink hover:underline">
+              <Link href={artistHref(item.artist)} className="font-medium text-ink hover:underline">
                 {item.artist}
               </Link>
             )}
@@ -69,16 +68,16 @@ export function SeedHeader({
                 </Link>
               </>
             )}
-            {year && ` · ${year}`}
-            {item.listeners != null && ` · ${formatCount(item.listeners)} listeners`}
-            {stats?.map((s) => ` · ${s}`)}
+            {[year, item.listeners != null ? `${formatCount(item.listeners)} listeners` : null, ...(stats ?? [])]
+              .filter(Boolean)
+              .map((x, i) => `${i || kind !== "artist" ? " · " : ""}${x}`)}
           </p>
         </div>
       </div>
-      <div className={`relative flex flex-wrap items-center gap-x-3 gap-y-3 ${compact ? "mt-4" : "mt-6"}`}>
-        {kind === "track" && <PlayButton item={item} size={compact ? "md" : "lg"} />}
-        <div className="flex items-center gap-2 rounded-full bg-black/30 py-1 pl-3 pr-3">
-          <span className="text-xs font-semibold text-sub">Your rating</span>
+      <div className={`relative flex flex-wrap items-center gap-x-2 gap-y-2 ${compact ? "mt-4" : "mt-5"}`}>
+        {kind === "track" && <PlayButton item={item} size="sm" />}
+        <div className="flex h-9 items-center gap-2 rounded-md border border-line px-3">
+          <span className="text-xs text-sub">Your rating</span>
           <Rating item={item} size={20} showLabel />
         </div>
         <OpenInSpotify item={item} />

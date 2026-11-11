@@ -30,7 +30,7 @@ export function MediaCard({
     subtitle ??
     (item.kind === "artist" ? "Artist" : item.kind === "album" ? `${year ? `${year} · ` : ""}${item.artist}` : item.artist);
   return (
-    <div {...hoverPrefetch(item)} className="group relative w-full rounded-lg p-3 transition-colors duration-200 hover:bg-hl/80 animate-rise">
+    <div {...hoverPrefetch(item)} className="group relative w-full rounded-lg p-2.5 transition-colors hover:bg-elev">
       <Link
         href={hrefFor(item.kind, item.artist, item.title)}
         onClick={onOpen}
@@ -38,7 +38,7 @@ export function MediaCard({
         className="absolute inset-0 z-0 rounded-lg"
       />
       <div className="pointer-events-none relative">
-        <Artwork src={item.image} alt={item.title} kind={item.kind} className="aspect-square w-full shadow-[0_8px_24px_rgb(0_0_0/0.5)]" />
+        <Artwork src={item.image} alt={item.title} kind={item.kind} className="aspect-square w-full" />
         {badge && <div className="absolute left-2 top-2">{badge}</div>}
         <div className="pointer-events-auto absolute bottom-2 right-2 z-10 translate-y-2 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
           {item.kind === "track" ? (
@@ -49,15 +49,15 @@ export function MediaCard({
               onClick={(e) => e.stopPropagation()}
               aria-label={`Discover music like ${item.title}`}
               title="Discover similar"
-              className="grid size-12 place-items-center rounded-full bg-find text-black shadow-[0_8px_16px_rgb(0_0_0/0.4)] transition-transform hover:scale-105"
+              className="grid size-10 place-items-center rounded-full bg-find text-black hover:bg-brand-hi"
             >
-              <Compass className="size-6" />
+              <Compass className="size-5" />
             </Link>
           )}
         </div>
       </div>
-      <p className="pointer-events-none relative mt-3 truncate text-[15px] font-bold">{item.title}</p>
-      <p className="pointer-events-none relative mt-0.5 line-clamp-2 text-sm text-sub">{sub}</p>
+      <p className="pointer-events-none relative mt-2.5 truncate text-sm font-medium">{item.title}</p>
+      <p className="pointer-events-none relative mt-0.5 line-clamp-2 text-[13px] text-sub">{sub}</p>
       {item.kind === "artist" && (
         <div className="relative z-10 mt-1.5 w-fit">
           <Rating item={item} size={14} />
@@ -72,27 +72,27 @@ export function Shelf({ title, subtitle, href, children, loading }: { title: str
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (dir: number) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.8, behavior: "smooth" });
   return (
-    <section className="group/shelf mt-6 first:mt-2">
-      <div className="flex items-end justify-between gap-4 px-4 md:px-6">
+    <section className="group/shelf mt-8 first:mt-2">
+      <div className="flex items-end justify-between gap-4 px-4 md:px-8">
         <div className="min-w-0">
-          <h2 className="truncate text-2xl font-bold tracking-tight hover:underline">{href ? <Link href={href}>{title}</Link> : title}</h2>
-          {subtitle && <p className="mt-0.5 truncate text-sm text-sub">{subtitle}</p>}
+          <h2 className="truncate text-lg font-semibold tracking-tight">{href ? <Link href={href} className="hover:underline">{title}</Link> : title}</h2>
+          {subtitle && <p className="mt-0.5 truncate text-[13px] text-sub">{subtitle}</p>}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1">
           {href && (
-            <Link href={href} className="text-sm font-bold text-sub hover:text-ink hover:underline">
+            <Link href={href} className="btn btn-ghost btn-sm">
               Show all
             </Link>
           )}
-          <button onClick={() => scroll(-1)} aria-label="Scroll left" className="hidden size-8 place-items-center rounded-full bg-elev-2 text-sub hover:text-ink md:grid">
-            <ChevronLeft className="size-5" />
+          <button onClick={() => scroll(-1)} aria-label="Scroll left" className="btn btn-ghost btn-sm hidden !px-1.5 md:inline-flex">
+            <ChevronLeft className="size-4" />
           </button>
-          <button onClick={() => scroll(1)} aria-label="Scroll right" className="hidden size-8 place-items-center rounded-full bg-elev-2 text-sub hover:text-ink md:grid">
-            <ChevronRight className="size-5" />
+          <button onClick={() => scroll(1)} aria-label="Scroll right" className="btn btn-ghost btn-sm hidden !px-1.5 md:inline-flex">
+            <ChevronRight className="size-4" />
           </button>
         </div>
       </div>
-      <div ref={ref} className="no-scrollbar mt-2 flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth px-1 md:px-3">
+      <div ref={ref} className="no-scrollbar mt-2 flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth px-1.5 md:px-5.5">
         {loading
           ? Array.from({ length: 7 }, (_, i) => <CardSkeleton key={i} />)
           : children}
@@ -102,12 +102,12 @@ export function Shelf({ title, subtitle, href, children, loading }: { title: str
 }
 
 export function ShelfItem({ children }: { children: ReactNode }) {
-  return <div className="w-[44vw] max-w-[200px] shrink-0 snap-start sm:w-[180px] lg:w-[200px]">{children}</div>;
+  return <div className="w-[44vw] max-w-[184px] shrink-0 snap-start sm:w-[168px] lg:w-[184px]">{children}</div>;
 }
 
 export function CardSkeleton() {
   return (
-    <div className="w-[44vw] max-w-[200px] shrink-0 p-3 sm:w-[180px] lg:w-[200px]">
+    <div className="w-[44vw] max-w-[184px] shrink-0 p-2.5 sm:w-[168px] lg:w-[184px]">
       <div className="aspect-square w-full animate-pulse rounded-md bg-hl" />
       <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-hl" />
       <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-hl" />
@@ -116,7 +116,7 @@ export function CardSkeleton() {
 }
 
 export function Grid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-1 px-1 sm:grid-cols-3 md:px-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">{children}</div>;
+  return <div className="grid grid-cols-2 gap-1 px-1.5 sm:grid-cols-3 md:px-5.5 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">{children}</div>;
 }
 
 /** Spotify-like track row. */
@@ -142,7 +142,7 @@ export function TrackRow({
   const s = usePlayer();
   const current = s.item?.key === item.key;
   return (
-    <div {...hoverPrefetch(item)} className={`group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-hl/70 md:px-4 ${showAlbum ? "md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]" : ""}`}>
+    <div {...hoverPrefetch(item)} className={`group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-elev md:px-4 ${showAlbum ? "md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto]" : ""}`}>
       <div className="relative grid w-8 place-items-center text-sub tabular-nums">
         {index != null && <span className={`group-hover:invisible ${current ? "text-brand" : ""}`}>{index}</span>}
         <div className={`${index != null ? "absolute invisible group-hover:visible" : ""}`}>
@@ -156,7 +156,7 @@ export function TrackRow({
             {item.title}
           </Link>
           <div className="flex min-w-0 items-center gap-2 text-sm text-sub">
-            {item.hasPreview === false && <span className="shrink-0 rounded-sm bg-hl-2 px-1 text-[10px] font-bold uppercase text-mute" title="No preview available">No preview</span>}
+            {item.hasPreview === false && <span className="shrink-0 rounded border border-line px-1 text-[10px] text-mute" title="No preview available">no preview</span>}
             <ArtistLine name={item.artist} />
           </div>
           {highlight}
@@ -185,21 +185,40 @@ export function TrackRow({
   );
 }
 
-export function SectionTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
+export function SectionTitle({ children, sub, actions }: { children: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-2 mt-8 px-4 md:px-6">
-      <h2 className="text-2xl font-bold tracking-tight">{children}</h2>
-      {sub && <p className="mt-0.5 text-sm text-sub">{sub}</p>}
+    <div className="mb-3 mt-10 flex items-end justify-between gap-4 px-4 md:px-8">
+      <div className="min-w-0">
+        <h2 className="text-lg font-semibold tracking-tight">{children}</h2>
+        {sub && <p className="mt-0.5 max-w-3xl text-[13px] text-sub">{sub}</p>}
+      </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>
+  );
+}
+
+/** Every page starts with the same plain header: title, one line of context, actions on the right. */
+export function PageHeader({ title, description, actions, icon }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: ReactNode }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4 px-4 pb-6 pt-4 md:px-8">
+      <div className="min-w-0">
+        <h1 className="flex items-center gap-2.5 text-2xl font-semibold tracking-tight md:text-[28px]">
+          {icon}
+          {title}
+        </h1>
+        {description && <p className="mt-1 max-w-2xl text-sm text-sub">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </header>
   );
 }
 
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mx-4 my-8 flex flex-col items-center rounded-xl bg-elev px-6 py-12 text-center md:mx-6">
-      <p className="text-xl font-bold">{title}</p>
-      {children && <div className="mt-2 max-w-md text-sub">{children}</div>}
-      {action && <div className="mt-6">{action}</div>}
+    <div className="panel mx-4 my-6 flex flex-col items-center px-6 py-12 text-center md:mx-8">
+      <p className="text-base font-semibold">{title}</p>
+      {children && <div className="mt-1.5 max-w-md text-sm text-sub">{children}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

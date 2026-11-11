@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     const { name } = await completeLogin(q.get("code") ?? "", q.get("state") ?? "");
     return page(
       `Connected as ${name}`,
-      "Spotifind can now save playlists to your Spotify. You can close this tab and go back to Spotifind — it picks this up automatically.",
+      "Spotifind can now save playlists to your Spotify and import your taste. You can close this tab and go back to Spotifind — it picks this up automatically.",
       true,
     );
   } catch (e) {

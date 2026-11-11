@@ -12,7 +12,7 @@ Spotifind is installed at **~/Applications/Spotifind.app**. Open it like any oth
 - **Open in Spotify** opens the Spotify desktop app directly.
 - API keys live in `~/Library/Application Support/Spotifind/config.env`. To edit them, use **Spotifind › API Keys…** (⌘,), then quit and reopen.
 - Server log: `~/Library/Logs/Spotifind/server.log`.
-- Shortcuts: ⌘1 Home, ⌘2 Search, ⌘3 Discover, ⌘4 Playlists, ⌘5 Recently Discovered, ⌘6 Ratings; ⌘[ / ⌘] back and forward; ⌘R reload; ⌘K search.
+- Shortcuts: ⌘1 Home, ⌘2 Search, ⌘3 Discover, ⌘4 Playlists, ⌘5 History, ⌘6 My Ratings, ⌘7 Rapid-fire; ⌘[ / ⌘] back and forward; ⌘R reload; ⌘K search.
 
 To rebuild and reinstall after changing the code:
 
@@ -51,7 +51,16 @@ MusicBrainz, Cover Art Archive and Deezer need no keys. Restart the server after
 - **Last.fm**: `track.getSimilar` and `artist.getSimilar` provide the % similarity shown on cards. They're based on what real listeners play together. Top tags describe genre, instrumentation, mood and vocals. Play counts identify deep cuts and hidden gems.
 - **Deezer**: artwork, search, and the **real 30-second previews** played in the bottom player. With no Last.fm key, Deezer's related-artist graph is the fallback.
 - **MusicBrainz**: original release years and studio discographies.
-- **Spotify**: only for exact links. Its audio-features and recommendations endpoints are closed to new apps, so no Spotify data affects ranking.
+- **Spotify**: checks that every recommended song and album really exists on Spotify, and supplies its cover art (see *Accurate artwork and availability* below). Its audio-features and recommendations endpoints are closed to new apps, so no Spotify data affects ranking.
+
+### Accurate artwork and availability
+
+Last.fm's album lists include compilations, "- Single"/"- EP" re-releases and "[Enhanced]" uploads that aren't on Spotify, and Deezer doesn't carry every song in every country. So `/api/enrich` looks up every song and album on Spotify, using your connected Spotify login (or `SPOTIFY_CLIENT_SECRET` if you add one). Lookups are cached for a week.
+
+- Recommendations (Discover, Home shelves, Playlists, Rapid-fire, genre pages) leave out anything Spotify doesn't have.
+- Covers come from Spotify first, then Deezer. Last.fm artwork is only a last resort.
+- Artists who share a name (for example the two bands called Pond) resolve to the best-known one.
+- With no Spotify login, nothing can be checked, so everything is shown as before.
 
 ### Honest limitations
 - No free API analyses the audio itself (groove, bassline, harmony). Spotifind approximates "how it sounds" with listener co-play similarity plus curated tag groups (`src/lib/recommend/tags.ts`).
@@ -82,6 +91,30 @@ Spotify requires the developer app's owner to have **Premium** (Spotify's Februa
 
 Each song shows why it's there and its real Last.fm similarity. **Swap** replaces a song with the next-best one; **Regenerate** rebuilds with the same settings; **Copy song list** copies "Artist – Title" lines. Stars you give inside a playlist count toward that style's score on the ratings page. 
 
+## Rapid-fire
+
+**Rapid-fire** (⌘7) is for rating fast. Pick *From my taste* or a song, album or artist, plus a style and the Very Similar ↔ More Adventurous slider (Discover's **Rapid-fire rate these** button fills these in). Spotifind then shows one song at a time with big artwork, the "why it matches" line, and its 30-second preview playing automatically.
+
+| Key | Action |
+|---|---|
+| 1–5 | Rate and go to the next song |
+| → or Space | Skip |
+| ← | Back |
+| Esc | Finish |
+
+The queue comes from the same pipeline as Discover and Playlists (`candidates.ts` → `score.ts` → `explain.ts`; see `src/lib/client/rapid.ts`). It leaves out songs with no preview, songs you've already rated (including 1★-hidden ones), and your imported Spotify top songs, and plays at most 3 songs per artist. When only a few songs are left, it quietly fetches more by re-ranking the pool with your updated taste. Songs you rate 4–5★ also become extra seeds, so your ratings change what comes next. When you finish, a summary shows how many songs you rated, your average stars and your top new artists, with a button that turns your 4–5★ songs into a playlist.
+
+## Import your taste from Spotify
+
+To avoid starting from nothing, choose **Import my taste from Spotify**. It's offered on the first-launch screen, in the Home onboarding, after saving a playlist to Spotify, and on My Ratings. Spotifind reads your top artists and top tracks for the all-time, last 6 months and last 4 weeks ranges, then maps them to Last.fm tags through the usual cache.
+
+- Imported items are **not** star ratings. They feed the taste profile (`deriveTaste` in `src/lib/taste/profile.ts`) at about a 4★ strength at most. Recent listening counts most: the last 4 weeks ×1.0, the last 6 months ×0.8, all-time ×0.6. Position in the top-50 scales each one from 1.0 down to 0.5. Imported items never hide anything.
+- A real rating of the same song or artist always replaces the imported signal.
+- My Ratings has an **Imported from Spotify** section. You can remove single items (a re-import keeps them out) or **Remove all imported**.
+- This needs the `user-top-read` permission. Logins made before this feature don't have it, so Spotifind asks you to **Reconnect Spotify** once.
+- If Spotify refuses (for example, the developer app's owner has no Premium, or your account isn't on the app's user list under Spotify's February 2026 rules), the error is shown in place and nothing else breaks.
+- Stored only in `~/Library/Application Support/Spotifind/spotify-import.json` (readable only by you). The browser only keeps a copy in memory.
+
 ## Speed
 
 - **Disk cache** (`~/Library/Caches/Spotifind/api-cache.sqlite`): everything fetched once is instant afterwards, across relaunches.
@@ -109,14 +142,18 @@ Your taste profile (tag weights + artist affinity) is always **derived from your
 - the tastes it learned, any of which you can remove
 - every rating, which you can edit
 
+## Interface
+
+One sidebar with two groups: **Discover** (Home, Search, Discover, Rapid-fire) and **Library** (Playlists, My ratings, History), then your playlists. Every page starts with the same plain header. **My ratings** has three tabs: *Ratings* (including top artists), *Taste profile* (recommendation quality, learned tastes, quick artist rating) and *From Spotify* (imported taste). Shared button, panel and input styles live in `src/app/globals.css` (`.btn`, `.panel`, `.option`, `.input`).
+
 ## Layout
 
 ```
-src/app/            pages (home, search, discover, track, album, artist, genre, recent, ratings) and api/* routes
+src/app/            pages (home, search, discover, rapid, track, album, artist, genre, recent, ratings) and api/* routes
 src/components/     Sidebar, TopBar, Player, Cards, Discovery (panel + grid), SeedHeader, Actions (stars), Logo
 macos/              Swift shell (WKWebView + server lifecycle), Info.plist, icon + build scripts
 src/lib/sources/    lastfm, deezer, musicbrainz, spotify, http (rate limits + cache)
 src/lib/recommend/  candidates, score, explain, tags
-src/lib/taste/      profile store
+src/lib/taste/      profile store (ratings) + imported Spotify taste
 src/lib/client/     data hooks (enrichment, years, JSON cache), player store
 ```

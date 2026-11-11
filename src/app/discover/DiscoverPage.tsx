@@ -11,6 +11,7 @@ import { useProfile } from "@/lib/taste/profile";
 import { DiscoverView } from "@/components/Discovery";
 import { SeedHeader } from "@/components/SeedHeader";
 import { Artwork } from "@/components/Artwork";
+import { PageHeader } from "@/components/Cards";
 import { discoverHref } from "@/components/Actions";
 
 function SeedPicker() {
@@ -28,42 +29,35 @@ function SeedPicker() {
   const go = (it: Item) => router.push(discoverHref(it.kind, it.artist, it.title));
 
   return (
-    <div className="px-4 md:px-6">
-      <div className="rounded-2xl bg-gradient-to-br from-find/25 via-elev to-brand/10 p-6 md:p-10">
-        <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-find">
-          <Compass className="size-4" /> Discover
-        </p>
-        <h1 className="mt-2 text-3xl font-extrabold tracking-tight md:text-5xl">Start from something you love.</h1>
-        <p className="mt-3 max-w-2xl text-sub">
-          Pick a song, album or artist. Spotifind finds music that matches its groove, instrumentation, mood and vocal feel — then lets you steer from
-          Closest Match to more adventurous.
-        </p>
+    <div>
+      <PageHeader title="Discover" description="Pick a song, album or artist to find music that sounds like it." />
+      <div className="px-4 md:px-8">
         <form
-          className="relative mt-6 max-w-xl"
+          className="relative max-w-xl"
           onSubmit={(e) => {
             e.preventDefault();
             setSubmitted(q.trim());
           }}
         >
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-sub" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sub" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. Chameleon — Herbie Hancock"
             aria-label="Choose a seed song, album or artist"
-            className="h-12 w-full rounded-full bg-black/50 pl-12 pr-28 text-ink placeholder:text-mute focus:outline-none focus:ring-2 focus:ring-find"
+            className="input h-11 w-full pl-9 pr-24"
           />
-          <button className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-find px-4 py-2 text-sm font-bold text-black">Find</button>
+          <button className="btn btn-primary btn-sm absolute right-1.5 top-1/2 -translate-y-1/2">Find</button>
         </form>
-      </div>
 
       {loading && (
         <p className="mt-6 flex items-center gap-2 text-sub">
           <Loader2 className="size-4 animate-spin" /> Searching…
         </p>
       )}
-      {results.length > 0 && <SeedList title="Pick a starting point" items={results} onPick={go} />}
-      {suggestions.length > 0 && <SeedList title="Or start from something you rated or viewed" items={suggestions} onPick={go} />}
+      {results.length > 0 && <SeedList title="Results" items={results} onPick={go} />}
+      {suggestions.length > 0 && <SeedList title="From your ratings and history" items={suggestions} onPick={go} />}
+      </div>
     </div>
   );
 }
@@ -71,19 +65,19 @@ function SeedPicker() {
 function SeedList({ title, items, onPick }: { title: string; items: Item[]; onPick: (it: Item) => void }) {
   return (
     <section className="mt-8">
-      <h2 className="mb-3 text-xl font-bold">{title}</h2>
+      <h2 className="label mb-2">{title}</h2>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
-          <button key={it.key} onClick={() => onPick(it)} className="group flex items-center gap-3 rounded-lg bg-elev p-2 text-left transition-colors hover:bg-hl">
-            <Artwork src={it.image} alt={it.title} kind={it.kind} className="size-14 shrink-0" />
+          <button key={it.key} onClick={() => onPick(it)} className="group flex items-center gap-3 rounded-md border border-line bg-elev p-2 text-left transition-colors hover:bg-hl">
+            <Artwork src={it.image} alt={it.title} kind={it.kind} className="size-11 shrink-0" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{it.title}</span>
-              <span className="block truncate text-sm capitalize text-sub">
+              <span className="block truncate text-sm font-medium">{it.title}</span>
+              <span className="block truncate text-[13px] capitalize text-sub">
                 {it.kind === "track" ? "Song" : it.kind}
                 {it.kind !== "artist" && ` · ${it.artist}`}
               </span>
             </span>
-            <Compass className="mr-2 size-5 text-sub transition-colors group-hover:text-find" />
+            <Compass className="mr-2 size-4 text-mute transition-colors group-hover:text-ink" />
           </button>
         ))}
       </div>
@@ -103,10 +97,10 @@ export function DiscoverPage() {
         kind={kind}
         artist={artist}
         title={title}
-        label={`Discovering from this ${kind === "track" ? "song" : kind}`}
+        label={`Discover from this ${kind === "track" ? "song" : kind}`}
         compact
         extra={
-          <Link href="/discover" className="text-sm font-semibold text-sub hover:text-ink hover:underline">
+          <Link href="/discover" className="btn btn-ghost btn-sm">
             Change seed
           </Link>
         }

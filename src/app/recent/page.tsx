@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useProfile } from "@/lib/taste/profile";
-import { EmptyState, Grid, MediaCard } from "@/components/Cards";
+import { EmptyState, Grid, MediaCard, PageHeader } from "@/components/Cards";
 
 function ago(t: number) {
   const m = Math.round((Date.now() - t) / 60000);
@@ -18,15 +18,12 @@ export default function RecentlyDiscoveredPage() {
   const list = p.recentlyDiscovered;
   return (
     <div>
-      <div className="px-4 pb-4 pt-2 md:px-6">
-        <h1 className="text-4xl font-extrabold tracking-tight">Recently Discovered</h1>
-        <p className="mt-1 text-sm text-sub">Recommendations you opened, and what led you there</p>
-      </div>
+      <PageHeader title="History" description="Recommendations you opened, and what led you there." />
       {list.length === 0 ? (
         <EmptyState
           title="Nothing discovered yet"
           action={
-            <Link href="/discover" className="rounded-full bg-ink px-6 py-2.5 font-bold text-black">
+            <Link href="/discover" className="btn btn-primary">
               Start discovering
             </Link>
           }

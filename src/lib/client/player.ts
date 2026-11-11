@@ -74,6 +74,10 @@ async function load(item: Item, index: number, queue: Item[]) {
 }
 
 export const player = {
+  /** Current state, for code outside React. */
+  state(): PlayerState {
+    return s;
+  },
   play(item: Item, queue?: Item[]) {
     const q = queue && queue.length ? queue : [item];
     const idx = Math.max(0, q.findIndex((x) => x.key === item.key));

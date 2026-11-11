@@ -10,11 +10,16 @@
 //   2★  "less like this"             tags −0.4   artist −0.34
 //   1★  "not for me": hidden from recommendations, tags −0.75, artist −0.5
 //       (rating an ARTIST 1★ hides that artist entirely)
+//
+// Imported Spotify taste (your top artists/tracks, see imported.ts) adds a weaker signal: at most a 4★
+// equivalent, scaled by its weight (long term → short term, chart position). It never hides anything,
+// and a real rating of the same item replaces it.
 
 import { useMemo, useSyncExternalStore } from "react";
-import type { Item, TagVector } from "../types";
+import type { ImportedItem, Item, TagVector } from "../types";
 import { norm } from "../util";
 import type { TasteInput } from "../recommend/score";
+import { useImported } from "./imported";
 
 export interface Entry { item: Item; at: number; via?: string }
 
@@ -191,7 +196,7 @@ export interface DerivedTaste {
   hidden: Set<string>; // keys rated 1★
 }
 
-export function deriveTaste(p: Profile): DerivedTaste {
+export function deriveTaste(p: Profile, imported: ImportedItem[] = []): DerivedTaste {
   const tags: TagVector = {};
   const artists: Record<string, number> = {};
   const hiddenArtists = new Set<string>();
@@ -211,6 +216,17 @@ export function deriveTaste(p: Profile): DerivedTaste {
     artists[a] = (artists[a] ?? 0) + (ARTIST_DELTA[r.rating] ?? 0) * (r.rating >= 4 ? boost : 1);
     if (r.item.kind === "artist" && r.rating === 1) hiddenArtists.add(a);
   }
+  // Imported signals: ≤ 4★ each. Skipped when you rated the item (or, for an artist, rated the artist itself).
+  for (const it of imported) {
+    if (p.ratings[it.key]) continue;
+    const w = Math.max(0, Math.min(1, it.weight));
+    loved.add(it.key); // you already know it: Discover favours new music over it
+    for (const [t, tw] of Object.entries(it.tags ?? {})) {
+      if (!removed.has(t)) tags[t] = (tags[t] ?? 0) + TAG_DELTA[4] * w * tw;
+    }
+    const a = norm(it.artist);
+    artists[a] = (artists[a] ?? 0) + ARTIST_DELTA[4] * w * (it.kind === "artist" ? 1.5 : 1);
+  }
   for (const t of Object.keys(tags)) {
     const v = Math.max(-5, Math.min(10, tags[t]));
     if (Math.abs(v) < 0.01) delete tags[t];
@@ -226,7 +242,8 @@ export function deriveTaste(p: Profile): DerivedTaste {
 
 export function useDerivedTaste(): DerivedTaste {
   const p = useProfile();
-  return useMemo(() => deriveTaste(p), [p]);
+  const imp = useImported();
+  return useMemo(() => deriveTaste(p, imp.items), [p, imp]);
 }
 
 export function useTasteInput(): TasteInput {
@@ -234,9 +251,9 @@ export function useTasteInput(): TasteInput {
   return useMemo(() => ({ tags: d.tags, artists: d.artists, loved: d.loved, hidden: d.hidden }), [d]);
 }
 
-/** True once at least one thing is rated 4★ or more. */
-export function hasTaste(p: Profile) {
-  return Object.values(p.ratings).some((r) => r.rating >= 4);
+/** True once at least one thing is rated 4★ or more (or a Spotify taste import exists). */
+export function hasTaste(p: Profile, imported: ImportedItem[] = []) {
+  return imported.length > 0 || Object.values(p.ratings).some((r) => r.rating >= 4);
 }
 
 // ------------------------------------------------------------------ top rated lists (sidebar)

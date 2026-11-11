@@ -9,7 +9,7 @@ import type { SearchResponse } from "../api/search/route";
 import { useJson } from "@/lib/client/data";
 import { taste, useProfile } from "@/lib/taste/profile";
 import { Artwork } from "@/components/Artwork";
-import { MediaCard, Shelf, ShelfItem, TrackRow } from "@/components/Cards";
+import { PageHeader, MediaCard, Shelf, ShelfItem, TrackRow } from "@/components/Cards";
 import { discoverHref, OpenInSpotify, PlayButton } from "@/components/Actions";
 import { hrefFor } from "@/lib/util";
 
@@ -34,19 +34,19 @@ const BROWSE: { tag: string; color: string }[] = [
 
 function TopResult({ item, onPick }: { item: Item; onPick: () => void }) {
   return (
-    <div className="group relative rounded-lg bg-elev p-5 transition-colors hover:bg-hl">
+    <div className="group relative rounded-lg border border-line bg-elev p-4 transition-colors hover:bg-hl">
       <Link href={hrefFor(item.kind, item.artist, item.title)} onClick={onPick} className="absolute inset-0 rounded-lg" aria-label={`Open ${item.title}`} />
-      <Artwork src={item.image} alt={item.title} kind={item.kind} className="pointer-events-none relative size-24 shadow-[0_8px_24px_rgb(0_0_0/0.5)]" />
-      <p className="pointer-events-none relative mt-5 truncate text-3xl font-extrabold tracking-tight">{item.title}</p>
+      <Artwork src={item.image} alt={item.title} kind={item.kind} className="pointer-events-none relative size-20" />
+      <p className="pointer-events-none relative mt-4 truncate text-xl font-semibold tracking-tight">{item.title}</p>
       <p className="pointer-events-none relative mt-1 text-sm text-sub">
-        <span className="mr-2 rounded-full bg-black/40 px-2.5 py-1 text-xs font-bold capitalize text-ink">{item.kind === "track" ? "Song" : item.kind}</span>
+        <span className="mr-1.5 capitalize text-mute">{item.kind === "track" ? "Song" : item.kind}</span>
         {item.kind !== "artist" && item.artist}
       </p>
       <div className="relative mt-5 flex flex-wrap items-center gap-2">
         <Link
           href={discoverHref(item.kind, item.artist, item.title)}
           onClick={onPick}
-          className="flex items-center gap-2 rounded-full bg-find px-4 py-2 text-sm font-bold text-black transition-transform hover:scale-105"
+          className="btn btn-primary"
         >
           <Compass className="size-4" /> Find music like this
         </Link>
@@ -71,14 +71,16 @@ export function SearchView() {
 
   if (!q) {
     return (
-      <div className="px-4 md:px-6">
+      <div>
+      <PageHeader title="Search" description="Find a song, album or artist, or paste a Spotify link." />
+      <div className="px-4 md:px-8">
         {p.recentQueries.length > 0 && (
           <section className="mb-8">
-            <h2 className="mb-3 text-2xl font-bold tracking-tight">Recent searches</h2>
+            <h2 className="mb-3 text-lg font-semibold tracking-tight">Recent searches</h2>
             <div className="flex flex-wrap gap-2">
               {p.recentQueries.map((rq) => (
-                <Link key={rq} href={`/search?q=${encodeURIComponent(rq)}`} className="flex items-center gap-2 rounded-full bg-hl px-4 py-1.5 text-sm font-semibold hover:bg-hl-2">
-                  <History className="size-4 text-sub" /> {rq}
+                <Link key={rq} href={`/search?q=${encodeURIComponent(rq)}`} className="flex items-center gap-1.5 rounded-full border border-line bg-elev px-3 py-1 text-[13px] hover:bg-hl">
+                  <History className="size-3.5 text-mute" /> {rq}
                 </Link>
               ))}
             </div>
@@ -93,26 +95,26 @@ export function SearchView() {
             ))}
           </Shelf>
         )}
-        <div className="mt-8 rounded-xl border border-line bg-elev p-4 text-sm text-sub">
-          <p className="flex items-center gap-2 font-semibold text-ink">
-            <Link2 className="size-4 text-brand" /> Paste a Spotify link
+        <div className="panel mt-8 p-4 text-sm text-sub">
+          <p className="flex items-center gap-2 font-medium text-ink">
+            <Link2 className="size-4 text-sub" /> Paste a Spotify link
           </p>
           <p className="mt-1">Drop an open.spotify.com track, album or artist link in the search bar to start discovering from it.</p>
         </div>
-        <h2 className="mb-3 mt-8 text-2xl font-bold tracking-tight">Browse by sound</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <h2 className="mb-3 mt-8 text-lg font-semibold tracking-tight">Browse by sound</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {BROWSE.map((b) => (
             <Link
               key={b.tag}
               href={`/genre/${encodeURIComponent(b.tag.toLowerCase())}`}
-              className="relative aspect-[1.6] overflow-hidden rounded-lg p-4 text-xl font-extrabold tracking-tight transition-transform hover:scale-[1.02]"
-              style={{ background: b.color }}
+              className="flex items-center gap-2.5 rounded-md border border-line bg-elev px-3 py-2.5 text-sm transition-colors hover:bg-hl"
             >
+              <span className="size-2.5 shrink-0 rounded-full" style={{ background: b.color }} />
               {b.tag}
-              <span className="absolute -bottom-3 -right-4 size-20 rotate-[25deg] rounded-md bg-black/25 shadow-xl" />
             </Link>
           ))}
         </div>
+      </div>
       </div>
     );
   }
@@ -122,31 +124,31 @@ export function SearchView() {
   return (
     <div>
       {loading && (
-        <p className="flex items-center gap-2 px-4 text-sub md:px-6">
+        <p className="flex items-center gap-2 px-4 text-sub md:px-8">
           <Loader2 className="size-4 animate-spin" /> Searching…
         </p>
       )}
-      {error && <p className="px-4 text-danger md:px-6">Search failed: {error}</p>}
+      {error && <p className="px-4 text-danger md:px-8">Search failed: {error}</p>}
       {data?.note && (
-        <p className="mx-4 mb-4 flex items-center gap-2 rounded-lg bg-elev px-3 py-2 text-sm text-sub md:mx-6">
-          <Link2 className="size-4 shrink-0 text-brand" /> {data.note}
+        <p className="panel mx-4 mb-4 flex items-center gap-2 px-3 py-2 text-sm text-sub md:mx-8">
+          <Link2 className="size-4 shrink-0 text-sub" /> {data.note}
         </p>
       )}
       {data && !data.top && !data.tracks.length && (
-        <div className="px-4 py-12 text-center md:px-6">
-          <p className="text-xl font-bold">No results found for “{q}”</p>
+        <div className="px-4 py-12 text-center md:px-8">
+          <p className="text-base font-semibold">No results for “{q}”</p>
           <p className="mt-2 text-sub">Check the spelling, or try fewer or different keywords.</p>
         </div>
       )}
       {data?.top && (
-        <div className="grid gap-6 px-4 md:px-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="grid gap-6 px-4 md:px-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <section>
-            <h2 className="mb-3 text-2xl font-bold tracking-tight">Top result</h2>
+            <h2 className="mb-3 text-lg font-semibold tracking-tight">Top result</h2>
             <TopResult item={data.top} onPick={pick(data.top)} />
           </section>
           {data.tracks.length > 0 && (
             <section className="min-w-0">
-              <h2 className="mb-3 text-2xl font-bold tracking-tight">Songs</h2>
+              <h2 className="mb-3 text-lg font-semibold tracking-tight">Songs</h2>
               <div onClickCapture={(e) => {
                 const row = (e.target as HTMLElement).closest("[data-key]");
                 const it = data.tracks.find((t) => t.key === row?.getAttribute("data-key"));
@@ -158,7 +160,7 @@ export function SearchView() {
                       item={t}
                       queue={data.tracks}
                       extra={
-                        <Link href={discoverHref("track", t.artist, t.title)} title="Find music like this" className="rounded-full p-1.5 text-sub transition-colors hover:text-find">
+                        <Link href={discoverHref("track", t.artist, t.title)} title="Find music like this" className="rounded-md p-1.5 text-sub transition-colors hover:bg-hl hover:text-ink">
                           <Compass className="size-4" />
                         </Link>
                       }

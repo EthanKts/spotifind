@@ -151,8 +151,9 @@ function request(items: Item[]) {
   let added = false;
   for (const it of items) {
     if (enrich.has(it.key) || queued.has(it.key)) continue;
-    // Already complete? (artwork present and, for tracks, Deezer id known)
-    if (it.image && (it.kind !== "track" || it.deezerId)) {
+    // Artists with a photo are complete. Songs and albums are always checked: the server confirms they're
+    // on Spotify and swaps in Spotify's cover (Last.fm artwork is often missing or wrong).
+    if (it.kind === "artist" && it.image) {
       enrich.set(it.key, {});
       continue;
     }
@@ -162,7 +163,7 @@ function request(items: Item[]) {
   if (added && !timer) timer = setTimeout(flush, 40);
 }
 
-/** Merge Deezer artwork / preview availability into items (requests missing ones in batches). */
+/** Merge artwork, preview and Spotify availability into items (requests missing ones in batches). */
 export function useEnriched<T extends Item>(items: T[]): T[] {
   useSyncExternalStore(
     (l) => {
@@ -180,7 +181,8 @@ export function useEnriched<T extends Item>(items: T[]): T[] {
     if (!e) return it;
     return {
       ...it,
-      image: it.image ?? e.image,
+      image: (it.kind === "artist" ? it.image ?? e.image : e.image ?? it.image),
+      onSpotify: e.onSpotify ?? it.onSpotify,
       deezerId: it.deezerId ?? e.deezerId,
       hasPreview: it.hasPreview ?? e.hasPreview,
       album: it.album ?? e.album,
@@ -191,7 +193,7 @@ export function useEnriched<T extends Item>(items: T[]): T[] {
 
 export async function enrichOne(item: Item): Promise<Item> {
   const e = enrich.get(item.key);
-  if (e && (e.deezerId || e.image)) return { ...item, ...e, image: item.image ?? e.image };
+  if (e && (e.deezerId || e.image)) return { ...item, ...e, image: e.image ?? item.image };
   const res = await fetch("/api/enrich", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -199,8 +201,11 @@ export async function enrichOne(item: Item): Promise<Item> {
   }).then((r) => r.json() as Promise<Record<string, Enrichment>>);
   const got = res[item.key] ?? {};
   enrich.set(item.key, got);
-  return { ...item, ...got, image: item.image ?? got.image };
+  return { ...item, ...got, image: got.image ?? item.image };
 }
+
+/** Recommendations only show what you can actually play on Spotify. Unchecked items (no Spotify login) stay. */
+export const playableOnSpotify = (it: { onSpotify?: boolean }) => it.onSpotify !== false;
 
 // ------------------------------------------------------------------ release years (MusicBrainz, 1 req/s)
 
