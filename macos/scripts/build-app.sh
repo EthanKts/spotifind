@@ -1,6 +1,8 @@
 #!/bin/bash
 # Builds Spotifind.app (web UI + bundled Node server + native Swift shell) and installs it into ~/Applications.
 #   --no-install   only build macos/build/Spotifind.app (used by package-share.sh); leaves your installed copy alone
+# SPOTIFIND_SHARED_ENV=<file>  copy that file into the bundle as Resources/shared.env (package-share.sh uses this
+#                              for the Last.fm key + Spotify Client ID friends get built in — never tokens or secrets)
 set -euo pipefail
 INSTALL=1
 [ "${1:-}" = "--no-install" ] && INSTALL=0
@@ -42,6 +44,9 @@ cp "$MAC/Resources/splash-mark.svg" "$APP/Contents/Resources/"
 cp "$BUILD/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp -L "$HOME/.local/node/bin/node" "$APP/Contents/Resources/node"
 ditto "$STAGE" "$APP/Contents/Resources/server"
+if [ -n "${SPOTIFIND_SHARED_ENV:-}" ]; then
+  cp "$SPOTIFIND_SHARED_ENV" "$APP/Contents/Resources/shared.env"
+fi
 codesign --force --deep --sign - "$APP"
 
 if [ "$INSTALL" = 0 ]; then

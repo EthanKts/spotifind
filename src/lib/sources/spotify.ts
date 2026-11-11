@@ -1,7 +1,7 @@
 import "server-only";
-import { fetchJson } from "./http";
+import { fetchJson, HttpError } from "./http";
 import type { Item, Kind } from "../types";
-import { itemKey, norm } from "../util";
+import { artistKey, itemKey, norm, textKey } from "../util";
 import { connectedUser, userAccessToken } from "./spotifyUser";
 
 // Client-credentials flow: catalogue lookups only (search, track/album/artist by id).
@@ -37,9 +37,26 @@ async function getToken(): Promise<string> {
   return token.value;
 }
 
+// Spotify gives personal (development-mode) apps a small request quota. When it's used up, Spotify answers 429
+// with a Retry-After that can be many hours. Remember that and stop asking until then, instead of retrying
+// every lookup (which only slows pages down and keeps the quota exhausted).
+const g = globalThis as unknown as { __sfSpotifyBlockedUntil?: number };
+export function spotifyBlockedUntil() {
+  return (g.__sfSpotifyBlockedUntil ?? 0) > Date.now() ? g.__sfSpotifyBlockedUntil : undefined;
+}
+export function noteSpotifyRateLimit(retryAfterSec: number) {
+  if (retryAfterSec > 10) g.__sfSpotifyBlockedUntil = Date.now() + retryAfterSec * 1000;
+}
+
 async function sp<T>(path: string, ttlSec = 6 * 3600): Promise<T> {
+  if (spotifyBlockedUntil()) throw new HttpError(429, "Spotify rate limit");
   const t = await getToken();
-  return fetchJson<T>(`https://api.spotify.com/v1${path}`, { ttlSec, headers: { Authorization: `Bearer ${t}` }, cacheKey: `sp:${path}` });
+  try {
+    return await fetchJson<T>(`https://api.spotify.com/v1${path}`, { ttlSec, headers: { Authorization: `Bearer ${t}` }, cacheKey: `sp:${path}` });
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 429) noteSpotifyRateLimit(e.retryAfter ?? 60);
+    throw e;
+  }
 }
 
 type SpImage = { url: string; width: number }[];
@@ -148,20 +165,20 @@ export async function oembedTitle(url: string): Promise<string | undefined> {
 
 /** Title without edition noise for comparing catalogues: "(Remastered 2011)", "[Enhanced]", "- Single", "- EP". */
 function relax(s: string) {
-  return norm(s.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, "").replace(/\s+-\s+.*$/, "")) || norm(s);
+  return norm(s.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, "").replace(/\s+-\s+.*$/, "")) || textKey(s);
 }
 /** Field filters break on quotes and apostrophes ("artist:Melody's Echo Chamber" finds nothing). */
 const q = (s: string) => s.replace(/["'’`]/g, "").replace(/\s*[\(\[][^\)\]]*[\)\]]/g, "").replace(/\s+-\s+(single|ep)$/i, "").trim();
 
 function sameTitle(a: string, b: string) {
-  if (norm(a) === norm(b)) return true;
+  if (textKey(a) === textKey(b)) return true;
   const x = relax(a);
   const y = relax(b);
   return x === y || (Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x)));
 }
 const hasArtist = (artists: { name: string }[], artist: string) => {
-  const a = norm(artist);
-  return artists.some((x) => norm(x.name) === a);
+  const a = artistKey(artist);
+  return artists.some((x) => artistKey(x.name) === a);
 };
 
 export interface SpotifyMatch {
@@ -189,7 +206,7 @@ export async function spotifyMatch(kind: Kind, artist: string, title: string): P
       const a = d.albums?.items.find((x) => x && hasArtist(x.artists, artist) && sameTitle(x.name, title));
       return a && { found: true, url: a.external_urls.spotify, image: img(a.images), year: yr(a.release_date) };
     }
-    const a = d.artists?.items.find((x) => x && norm(x.name) === norm(artist));
+    const a = d.artists?.items.find((x) => x && artistKey(x.name) === artistKey(artist));
     return a && { found: true, url: a.external_urls.spotify, image: img(a.images) };
   };
   const field = kind === "artist" ? `artist:${q(artist)}` : `${kind}:${q(title)} artist:${q(artist)}`;

@@ -12,9 +12,19 @@ export function norm(s: string): string {
     .trim();
 }
 
+/** Artist name for comparing catalogues: "The Parcels" (Last.fm) and "Parcels" (Spotify/Deezer) are the same band. */
+export function artistKey(s: string): string {
+  // textKey, not norm: non-Latin names (間宮貴子) must not all become "" and match each other.
+  return textKey(s).replace(/^the /, "");
+}
+
 /** norm(), but falls back to the trimmed lower-case original when normalising leaves nothing (e.g. 日本語 titles). */
 function keyPart(s: string): string {
   return norm(s) || s.trim().toLowerCase();
+}
+/** Like norm() for comparing titles, but non-Latin titles (日本語) don't all collapse to "" and match each other. */
+export function textKey(s: string): string {
+  return keyPart(s);
 }
 
 export function itemKey(kind: Kind, artist: string, title: string): string {

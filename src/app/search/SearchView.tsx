@@ -136,7 +136,7 @@ export function SearchView() {
       )}
       {data && !data.top && !data.tracks.length && (
         <div className="px-4 py-12 text-center md:px-8">
-          <p className="text-base font-semibold">No results for “{q}”</p>
+          <p className="text-[16px] font-semibold">No results for “{q}”</p>
           <p className="mt-2 text-sub">Check the spelling, or try fewer or different keywords.</p>
         </div>
       )}

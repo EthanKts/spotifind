@@ -97,3 +97,19 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] Clean visual style (no gradients, glows, scaling, badges)
 - [x] Simpler navigation: one grouped sidebar, tabbed My ratings
 - [x] Rebuild the Mac app and test
+
+## Artwork accuracy (round 10)
+- [x] Every card, song row and playlist cover uses verified artwork
+- [x] Deezer first, Spotify fallback, Last.fm album covers last
+- [x] Respect Spotify rate limits (stop asking until Retry-After)
+- [x] Retry failed lookups instead of caching blanks
+- [x] Artist matching: "The" prefix, non-Latin names, namesakes
+- [x] Rebuild the Mac app and test
+
+## One-click setup for friends (round 11)
+- [x] Shared copy carries your Last.fm key + Spotify Client ID (never tokens/secrets)
+- [x] First launch: Log in with Spotify → taste imported automatically
+- [x] Clear message for friends you haven't added yet
+- [x] New setup guide + packaging script with leak checks
+- [x] Fix invisible headings (text-base clashed with the "base" color)
+- [x] Rebuild app + share package and test

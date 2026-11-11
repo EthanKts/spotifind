@@ -32,9 +32,15 @@ final class ServerController {
 
     private static var pidFile: URL { supportDir.appendingPathComponent("server.pid") }
 
+    /// Defaults built into a shared copy (Resources/shared.env): the Last.fm key and Spotify Client ID of the
+    /// person who shared it. Each person's own config.env overrides them.
+    static var sharedFile: URL? { Bundle.main.resourceURL?.appendingPathComponent("shared.env") }
+
     /// KEY=VALUE lines from config.env (comments and blanks ignored).
-    static func readConfig() -> [String: String] {
-        guard let text = try? String(contentsOf: configFile, encoding: .utf8) else { return [:] }
+    static func readConfig() -> [String: String] { parseEnv(configFile) }
+
+    static func parseEnv(_ file: URL?) -> [String: String] {
+        guard let file, let text = try? String(contentsOf: file, encoding: .utf8) else { return [:] }
         var env: [String: String] = [:]
         for raw in text.split(whereSeparator: \.isNewline) {
             let line = raw.trimmingCharacters(in: .whitespaces)
@@ -73,6 +79,8 @@ final class ServerController {
         p.arguments = [serverDir.appendingPathComponent("server.js").path]
         p.currentDirectoryURL = serverDir
         var env = ProcessInfo.processInfo.environment
+        // Shared defaults are passed as SPOTIFIND_SHARED_*, so the server can tell "built in" from "your own".
+        for (k, v) in Self.parseEnv(Self.sharedFile) { env["SPOTIFIND_SHARED_" + k] = v }
         for (k, v) in Self.readConfig() { env[k] = v }
         env["PORT"] = String(Self.port)
         env["HOSTNAME"] = "127.0.0.1"

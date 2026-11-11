@@ -2,8 +2,9 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { configValue, setConfigValue, SUPPORT_DIR } from "./config";
+import { configValue, setConfigValue, sharedBy, sharedValue, SUPPORT_DIR } from "./config";
 import { mapLimit } from "./http";
+import { noteSpotifyRateLimit } from "./spotify";
 import { norm } from "../util";
 
 // Your Spotify account, connected with Authorization Code + PKCE (no client secret needed).
@@ -30,6 +31,14 @@ interface Auth {
 export function clientId(): string | undefined {
   return configValue("SPOTIFY_CLIENT_ID");
 }
+
+/** True when the Client ID is the one built into a shared copy (the sharer's Spotify app). */
+export function usingSharedClient() {
+  const shared = sharedValue("SPOTIFY_CLIENT_ID");
+  return !!shared && clientId() === shared;
+}
+
+export class NotApprovedError extends Error {}
 
 /** Save the Client ID to config.env (and use it immediately, no restart). */
 export function setClientId(id: string) {
@@ -137,7 +146,20 @@ export async function completeLogin(code: string, state: string): Promise<{ retu
     scope: j.scope ?? "",
   };
   writeAuth(auth);
-  const me = await api<{ id: string; display_name?: string; product?: string }>("/me");
+  let me: { id: string; display_name?: string; product?: string };
+  try {
+    me = await api<{ id: string; display_name?: string; product?: string }>("/me");
+  } catch (e) {
+    disconnect(); // a login that can't be used isn't a connection
+    // Spotify accepts the login but refuses every request from accounts the app owner hasn't added.
+    if (/\b403\b/.test((e as Error).message) && usingSharedClient()) {
+      const who = sharedBy() ?? "the person who sent you Spotifind";
+      throw new NotApprovedError(
+        `Spotify only lets ${who} share their Spotifind with people they've added (up to 5). Send ${who} the email address of your Spotify account; once you're added, click Log in with Spotify again.`,
+      );
+    }
+    throw e;
+  }
   writeAuth({ ...auth, user: { id: me.id, display_name: me.display_name, product: me.product } });
   return { returnTo: p.returnTo, name: me.display_name || me.id };
 }
@@ -182,8 +204,16 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
       if (a) writeAuth({ ...a, expires_at: 0 }); // force refresh
       continue;
     }
-    if (res.status === 429 && attempt < 2) {
-      const wait = Math.min(10, Number(res.headers.get("retry-after")) || 2);
+    if (res.status === 429) {
+      const after = Number(res.headers.get("retry-after")) || 2;
+      noteSpotifyRateLimit(after);
+      if (after > 10 || attempt >= 2) {
+        const h = after / 3600;
+        throw new Error(
+          `Spotify's request limit for your developer app is used up. Try again in ${h >= 1 ? `about ${Math.ceil(h)} hour${Math.ceil(h) > 1 ? "s" : ""}` : `${Math.ceil(after / 60)} minutes`}.`,
+        );
+      }
+      const wait = Math.min(10, after);
       await new Promise((r) => setTimeout(r, wait * 1000));
       continue;
     }

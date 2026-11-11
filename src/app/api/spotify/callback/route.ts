@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { completeLogin } from "@/lib/sources/spotifyUser";
+import { completeLogin, NotApprovedError } from "@/lib/sources/spotifyUser";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -7,11 +7,11 @@ function page(title: string, body: string, ok: boolean) {
   return new Response(
     `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · Spotifind</title><style>
-html,body{margin:0;height:100%;background:#121212;color:#fff;font:16px -apple-system,system-ui,sans-serif}
+html,body{margin:0;height:100%;background:#111113;color:#f4f4f5;font:15px -apple-system,system-ui,sans-serif}
 body{display:flex;align-items:center;justify-content:center;padding:16px}
-.card{max-width:460px;text-align:center;background:#181818;border-radius:16px;padding:32px}
-h1{font-size:24px;margin:0 0 8px} p{color:#b3b3b3;line-height:1.5;margin:0}
-.dot{width:56px;height:56px;border-radius:50%;margin:0 auto 16px;display:grid;place-items:center;font-size:28px;color:#000;background:${ok ? "#1ed760" : "#f3727f"}}
+.card{max-width:440px;text-align:center;background:#18181b;border:1px solid #2a2a2f;border-radius:10px;padding:28px}
+h1{font-size:20px;font-weight:600;margin:0 0 6px} p{color:#a1a1aa;line-height:1.5;margin:0}
+.dot{width:40px;height:40px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;font-size:20px;color:#000;background:${ok ? "#1ed760" : "#f3727f"}}
 </style></head><body><div class="card"><div class="dot">${ok ? "✓" : "!"}</div><h1>${esc(title)}</h1><p>${body}</p></div></body></html>`,
     { headers: { "Content-Type": "text/html; charset=utf-8" }, status: ok ? 200 : 400 },
   );
@@ -27,10 +27,11 @@ export async function GET(req: NextRequest) {
     const { name } = await completeLogin(q.get("code") ?? "", q.get("state") ?? "");
     return page(
       `Connected as ${name}`,
-      "Spotifind can now save playlists to your Spotify and import your taste. You can close this tab and go back to Spotifind — it picks this up automatically.",
+      "You can close this tab and go back to Spotifind — it picks this up automatically.",
       true,
     );
   } catch (e) {
+    if (e instanceof NotApprovedError) return page("Almost there", esc(e.message), false);
     return page("Couldn't connect to Spotify", esc((e as Error).message), false);
   }
 }

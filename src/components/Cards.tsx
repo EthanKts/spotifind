@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Compass } from "lucide-react";
-import { useRef, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import type { Item } from "@/lib/types";
 import type { RatingContext } from "@/lib/taste/profile";
 import { formatDuration, hrefFor } from "@/lib/util";
 import { Artwork } from "./Artwork";
 import { ArtistLine, discoverHref, OpenInSpotify, PlayButton, Rating } from "./Actions";
-import { hoverPrefetch, useYear } from "@/lib/client/data";
+import { hoverPrefetch, useEnriched, useYear } from "@/lib/client/data";
 import { usePlayer } from "@/lib/client/player";
 
 /** Spotify-style card: artwork, title, subtitle, hover action. */
 export function MediaCard({
-  item,
+  item: given,
   subtitle,
   badge,
   queue,
@@ -25,6 +25,8 @@ export function MediaCard({
   queue?: Item[];
   onOpen?: () => void;
 }) {
+  // Every card gets the verified cover (Spotify, then Deezer), whichever page it's on.
+  const [item] = useEnriched(useMemo(() => [given], [given]));
   const year = useYear(item.kind === "album" ? item : undefined);
   const sub =
     subtitle ??
@@ -121,7 +123,7 @@ export function Grid({ children }: { children: ReactNode }) {
 
 /** Spotify-like track row. */
 export function TrackRow({
-  item,
+  item: given,
   index,
   queue,
   showArt = true,
@@ -139,6 +141,7 @@ export function TrackRow({
   highlight?: ReactNode;
   ratingCtx?: RatingContext;
 }) {
+  const [item] = useEnriched(useMemo(() => [given], [given]));
   const s = usePlayer();
   const current = s.item?.key === item.key;
   return (
@@ -216,7 +219,7 @@ export function PageHeader({ title, description, actions, icon }: { title: React
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="panel mx-4 my-6 flex flex-col items-center px-6 py-12 text-center md:mx-8">
-      <p className="text-base font-semibold">{title}</p>
+      <p className="text-[16px] font-semibold">{title}</p>
       {children && <div className="mt-1.5 max-w-md text-sm text-sub">{children}</div>}
       {action && <div className="mt-5">{action}</div>}
     </div>

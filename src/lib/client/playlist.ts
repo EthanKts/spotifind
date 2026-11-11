@@ -151,11 +151,12 @@ export async function generatePlaylist(
         kind: "track", key: r.c.key, title: r.c.title, artist: r.c.artist, album: r.c.album ?? e.album,
         image: e.image ?? r.c.image, deezerId: e.deezerId, hasPreview: e.hasPreview, durationSec: r.c.durationSec ?? e.durationSec,
         onSpotify: e.onSpotify,
+        noMatch: e.noMatch,
       };
       return { r, item };
     })
     // Songs Spotify doesn't have are left out (unchecked ones stay). Swap candidates are checked when swapped in.
-    .filter((x) => x.item.onSpotify !== false && (!settings.previewsOnly || x.item.hasPreview));
+    .filter((x) => x.item.onSpotify !== false && !x.item.noMatch && (!settings.previewsOnly || x.item.hasPreview));
 
   const reasons: Record<string, string> = {};
   const scores: Record<string, number> = {};

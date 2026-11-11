@@ -20,8 +20,9 @@ export interface BaseItem {
   deezerId?: number;
   hasPreview?: boolean;
   durationSec?: number;
-  /** See Enrichment.onSpotify. */
+  /** See Enrichment.onSpotify / noMatch. */
   onSpotify?: boolean;
+  noMatch?: boolean;
 }
 
 export type Item = BaseItem;
@@ -74,6 +75,10 @@ export interface Enrichment {
   /** true: confirmed on Spotify · false: Spotify doesn't have it · undefined: couldn't check (no Spotify login/key). */
   onSpotify?: boolean;
   spotifyUrl?: string;
+  /** A lookup failed (rate limit, timeout): the result may be missing artwork, so ask again later. */
+  incomplete?: boolean;
+  /** Neither Deezer nor Spotify recognises it (compilations, re-uploads, mis-tagged scrobbles). */
+  noMatch?: boolean;
   deezerId?: number;
   hasPreview?: boolean;
   year?: number;

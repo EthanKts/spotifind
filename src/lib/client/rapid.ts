@@ -102,7 +102,7 @@ export class RapidQueue {
         for (const r of batch) {
           const c = r.c;
           const e = extra[c.key] ?? {};
-          if (!e.hasPreview || !e.deezerId || e.onSpotify === false) {
+          if (!e.hasPreview || !e.deezerId || e.onSpotify === false || e.noMatch) {
             this.noPreview.add(c.key);
             continue;
           }

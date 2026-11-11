@@ -122,6 +122,17 @@ const queued = new Map<string, Item>();
 const enrichListeners = new Set<() => void>();
 let version = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
+/** Lookups that failed (network, rate limit) are retried a few times instead of leaving a blank cover. */
+const attempts = new Map<string, number>();
+function retryLater(b: Item) {
+  const n = (attempts.get(b.key) ?? 0) + 1;
+  attempts.set(b.key, n);
+  if (n > 3) return;
+  setTimeout(() => {
+    queued.set(b.key, b);
+    if (!timer) timer = setTimeout(flush, 40);
+  }, 3000 * n);
+}
 
 function flush() {
   timer = null;
@@ -133,12 +144,23 @@ function flush() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items: batch.map((b) => ({ kind: b.kind, artist: b.artist, title: b.title })) }),
   })
-    .then((r) => r.json())
+    .then((r) => {
+      if (!r.ok) throw new Error(`enrich ${r.status}`);
+      return r.json();
+    })
     .then((res: Record<string, Enrichment>) => {
-      for (const b of batch) enrich.set(b.key, res[b.key] ?? {});
+      for (const b of batch) {
+        const e = res[b.key] ?? {};
+        // Keep what we have now (better than nothing), but ask again if a source failed.
+        if (e.image || !enrich.get(b.key)?.image) enrich.set(b.key, e);
+        if (e.incomplete) retryLater(b);
+      }
     })
     .catch(() => {
-      for (const b of batch) enrich.set(b.key, {});
+      for (const b of batch) {
+        if (!enrich.has(b.key)) enrich.set(b.key, { incomplete: true });
+        retryLater(b);
+      }
     })
     .finally(() => {
       version++;
@@ -150,7 +172,8 @@ function flush() {
 function request(items: Item[]) {
   let added = false;
   for (const it of items) {
-    if (enrich.has(it.key) || queued.has(it.key)) continue;
+    if ((enrich.has(it.key) && !enrich.get(it.key)?.incomplete) || queued.has(it.key)) continue;
+    if (enrich.get(it.key)?.incomplete && (attempts.get(it.key) ?? 0) > 0) continue; // a retry is already scheduled
     // Artists with a photo are complete. Songs and albums are always checked: the server confirms they're
     // on Spotify and swaps in Spotify's cover (Last.fm artwork is often missing or wrong).
     if (it.kind === "artist" && it.image) {
@@ -183,6 +206,7 @@ export function useEnriched<T extends Item>(items: T[]): T[] {
       ...it,
       image: (it.kind === "artist" ? it.image ?? e.image : e.image ?? it.image),
       onSpotify: e.onSpotify ?? it.onSpotify,
+      noMatch: e.noMatch ?? it.noMatch,
       deezerId: it.deezerId ?? e.deezerId,
       hasPreview: it.hasPreview ?? e.hasPreview,
       album: it.album ?? e.album,
@@ -204,8 +228,11 @@ export async function enrichOne(item: Item): Promise<Item> {
   return { ...item, ...got, image: got.image ?? item.image };
 }
 
-/** Recommendations only show what you can actually play on Spotify. Unchecked items (no Spotify login) stay. */
-export const playableOnSpotify = (it: { onSpotify?: boolean }) => it.onSpotify !== false;
+/**
+ * Recommendations only show what you can actually play: not items Spotify says it doesn't have, and not items
+ * no catalogue recognises at all. Items still being checked stay.
+ */
+export const playableOnSpotify = (it: { onSpotify?: boolean; noMatch?: boolean }) => it.onSpotify !== false && !it.noMatch;
 
 // ------------------------------------------------------------------ release years (MusicBrainz, 1 req/s)
 

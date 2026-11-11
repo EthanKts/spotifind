@@ -6,6 +6,8 @@ import { Clock3, Compass, Home, ListMusic, Plus, Search, Star, Zap } from "lucid
 import { Logo } from "./Logo";
 import { useProfile, type Playlist } from "@/lib/taste/profile";
 import { Artwork } from "./Artwork";
+import { useEnriched } from "@/lib/client/data";
+import { useMemo } from "react";
 
 // One navigation column: what you do (Discover), what you've kept (Library), then your playlists.
 const GROUPS = [
@@ -35,7 +37,9 @@ function isActive(path: string, href: string) {
 }
 
 export function PlaylistCover({ pl, className = "" }: { pl: Playlist; className?: string }) {
-  const arts = pl.tracks.map((t) => t.image).filter(Boolean).slice(0, 4) as string[];
+  // Playlists keep the artwork from when they were made; refresh it with verified covers.
+  const tracks = useEnriched(useMemo(() => pl.tracks.slice(0, 8), [pl.tracks]));
+  const arts = tracks.map((t) => t.image).filter(Boolean).slice(0, 4) as string[];
   if (arts.length < 4) return <Artwork src={arts[0]} alt={pl.name} kind="album" className={className} />;
   return (
     <div className={`grid grid-cols-2 overflow-hidden rounded ${className}`} role="img" aria-label={pl.name}>

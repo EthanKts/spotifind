@@ -136,7 +136,7 @@ export function SpotifyExport({ pl }: { pl: Playlist }) {
             <button onClick={close} aria-label="Close" className="absolute right-3 top-3 rounded-full p-1.5 text-sub hover:bg-hl hover:text-ink">
               <X className="size-5" />
             </button>
-            <h2 className="pr-8 text-base font-semibold">
+            <h2 className="pr-8 text-[16px] font-semibold">
               Save “{pl.name}” to Spotify
             </h2>
 

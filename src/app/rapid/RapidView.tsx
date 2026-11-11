@@ -490,7 +490,7 @@ export function RapidView() {
         <div key={it.key} className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center px-4 pb-6 pt-4 text-center animate-fade-in">
           <Artwork src={it.image} alt={`${it.title} by ${it.artist}`} kind="track" className="aspect-square w-full max-w-[min(340px,36vh)]" />
           <h2 className="mt-5 line-clamp-2 text-2xl font-semibold tracking-tight">{it.title}</h2>
-          <div className="mt-1 flex max-w-full justify-center text-base text-sub">
+          <div className="mt-1 flex max-w-full justify-center text-[16px] text-sub">
             <ArtistLine name={it.artist} />
           </div>
           <p className="mt-2 max-w-lg text-sm text-sub">

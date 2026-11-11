@@ -3,76 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to set up Spotifind</title>
+<title>Set up Spotifind</title>
 <style>
-  :root { color-scheme: dark; --green: #1ed760; --sub: #b3b3b3; --card: #181818; }
-  html, body { margin: 0; background: #121212; color: #fff; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
-  main { max-width: 720px; margin: 0 auto; padding: 40px 20px 64px; }
-  h1 { font-size: 34px; letter-spacing: -0.02em; margin: 0 0 4px; }
-  h2 { font-size: 22px; margin: 36px 0 8px; display: flex; align-items: center; gap: 10px; }
-  h2 .n { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--green); color: #000; font-size: 16px; }
-  p, li { color: var(--sub); }
-  b, strong { color: #fff; }
-  a { color: var(--green); font-weight: 600; }
-  ol { padding-left: 22px; } li { margin: 6px 0; }
-  code { background: #000; color: #fff; padding: 2px 7px; border-radius: 6px; font: 14px ui-monospace, Menlo, monospace; word-break: break-all; }
-  .card { background: var(--card); border-radius: 14px; padding: 4px 20px 12px; margin-top: 10px; }
-  .note { border-left: 3px solid var(--green); padding: 4px 14px; background: #0d1f14; border-radius: 0 10px 10px 0; }
-  .lead { font-size: 18px; color: var(--sub); margin-top: 0; }
+  :root { color-scheme: dark; --bg: #111113; --panel: #18181b; --line: #2a2a2f; --ink: #f4f4f5; --sub: #a1a1aa; --green: #1ed760; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 48px 20px 64px; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; }
+  h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+  .lead { color: var(--sub); margin: 0 0 28px; }
+  .step { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 18px 20px; margin-top: 12px; }
+  .num { color: var(--sub); font-size: 13px; margin-bottom: 2px; }
+  p, li { color: var(--sub); margin: 6px 0; }
+  b { color: var(--ink); font-weight: 600; }
+  ol { padding-left: 20px; margin: 8px 0 0; }
+  a { color: var(--ink); }
+  code { background: #000; color: var(--ink); padding: 2px 6px; border-radius: 4px; font: 13px ui-monospace, Menlo, monospace; word-break: break-all; }
+  .small { font-size: 13px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Spotifind</h1>
-  <p class="lead">Spotify is where you listen. Spotifind is where you discover music you’ll love — recommendations that match a song’s groove, mood and feel, playlists of hidden gems, and one-click saving to your Spotify.</p>
-  <p>Needs a Mac with Apple silicon (M1 or newer) running macOS 14 Sonoma or later.</p>
+  <h1>Set up Spotifind</h1>
+  <p class="lead">Spotifind finds new music based on what you already like, and saves the playlists you make to your Spotify. Setup takes about two minutes.</p>
 
-  <h2><span class="n">1</span> Install</h2>
-  <div class="card">
+  <div class="step">
+    <div class="num">Before you start</div>
+    <h2>Send {{SHARED_BY}} your Spotify email</h2>
+    <p>Spotify only lets {{SHARED_BY}} share Spotifind with people they’ve added. Send them the <b>email address of your Spotify account</b> (Spotify app → Settings → Account). You don’t need Spotify Premium.</p>
+  </div>
+
+  <div class="step">
+    <div class="num">Step 1</div>
+    <h2>Install</h2>
     <ol>
-      <li>Drag <b>Spotifind</b> into your <b>Applications</b> folder.</li>
-      <li>Open it. Because it’s a personal app (not from the App Store), macOS blocks it the first time and says it can’t verify the developer. Click <b>Done</b>, then:</li>
-      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to the message about Spotifind and click <b>Open Anyway</b>, then confirm. You only do this once.</li>
+      <li>Drag <b>Spotifind</b> into your <b>Applications</b> folder, then open it.</li>
+      <li>macOS will say it can’t check the app, because it isn’t from the App Store. Click <b>Done</b>.</li>
+      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to “Spotifind was blocked” and click <b>Open Anyway</b>. You only do this once.</li>
     </ol>
-    <p>If macOS instead says the app “is damaged”, open the Terminal app, paste this and press Return, then open Spotifind again:<br>
-      <code>xattr -dr com.apple.quarantine /Applications/Spotifind.app</code></p>
+    <p class="small">If macOS says the app “is damaged”, open Terminal, paste this, press Return, and open Spotifind again:<br><code>xattr -dr com.apple.quarantine /Applications/Spotifind.app</code></p>
   </div>
 
-  <h2><span class="n">2</span> Get your free Last.fm API key</h2>
-  <div class="card">
-    <p>Spotifind’s recommendations come from Last.fm listening data, and everyone uses their own free key. Spotifind asks for it on first launch.</p>
-    <ol>
-      <li>Go to <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> and log in — or create a free Last.fm account first.</li>
-      <li>Fill in <b>Application name</b> (for example “Spotifind”) and a short <b>Application description</b>. Leave <b>Callback URL</b> and <b>Application homepage</b> empty. Submit.</li>
-      <li>Copy the <b>API key</b> (32 letters and numbers). Don’t use the “Shared secret”.</li>
-      <li>Paste it into Spotifind’s welcome screen and click <b>Start discovering</b>. Spotifind checks it with Last.fm right away.</li>
-    </ol>
+  <div class="step">
+    <div class="num">Step 2</div>
+    <h2>Log in with Spotify</h2>
+    <p>Click <b>Log in with Spotify</b> on the welcome screen. Your browser opens Spotify’s page; click <b>Agree</b>, then go back to Spotifind. It learns your taste from what you listen to, and you’re ready.</p>
+    <p class="small">If the browser says you aren’t added yet, ask {{SHARED_BY}} to add your Spotify email, then click Log in with Spotify again.</p>
   </div>
 
-  <h2><span class="n">3</span> Connect your Spotify (to save playlists)</h2>
-  <div class="card">
-    <p class="note">Spotify only allows this for accounts with <b>Spotify Premium</b> (Spotify’s rule for personal apps since February 2026). Everything else in Spotifind works without it.</p>
-    <ol>
-      <li>Go to <a href="https://developer.spotify.com/dashboard">developer.spotify.com/dashboard</a>, log in with your Spotify account and accept the developer terms.</li>
-      <li>Click <b>Create app</b>. Name: <b>Spotifind</b>. Description: anything.</li>
-      <li>Under <b>Redirect URIs</b> add exactly:<br><code>http://127.0.0.1:47320/api/spotify/callback</code><br>and click <b>Add</b>.</li>
-      <li>Under “Which API/SDKs are you planning to use?” tick <b>Web API</b>, accept the terms and <b>Save</b>.</li>
-      <li>Open the app’s <b>Settings</b> and copy the <b>Client ID</b>. (You don’t need the client secret.)</li>
-      <li>In Spotifind, make a playlist (sidebar → <b>Playlists</b>), open it and press <b>Save to Spotify</b>. Paste the Client ID, click <b>Connect Spotify</b>, and approve in the browser page that opens. Come back to Spotifind — it saves the playlist automatically.</li>
-    </ol>
-    <p>After that, <b>Save to Spotify</b> works in one click, and <b>Update on Spotify</b> syncs changes. Your Spotify login stays on your Mac; <b>Disconnect</b> is in the same dialog.</p>
-  </div>
-
-  <h2><span class="n">4</span> Using Spotifind</h2>
-  <div class="card">
-    <ul>
-      <li><b>Discover</b>: start from any song, album or artist. Pick a style — Closest Match, Deep Cuts, Hidden Gems, Same Groove, Same Mood, Explore Further — and slide from “Very Similar” to “More Adventurous”.</li>
-      <li><b>Rate with stars</b>: 4–5★ gets you more like it, 1★ hides it. Hover any artist name to rate the artist. Ratings are how Spotifind learns your taste.</li>
-      <li><b>Playlists</b>: 10–50 songs in the style you choose, from your taste or one starting point.</li>
-      <li><b>Open in Spotify</b> jumps straight into the Spotify app. Previews in Spotifind are 30 seconds.</li>
-    </ul>
-    <p>Everything you rate and every key you enter is stored only on your Mac (in <code>~/Library/Application Support/Spotifind</code>). To uninstall, delete the app and that folder.</p>
-  </div>
+  <p class="small" style="margin-top:28px">Needs a Mac with Apple silicon (M1 or newer) and macOS 14 or later. Your Spotify login stays on your Mac.</p>
 </main>
 </body>
 </html>

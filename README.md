@@ -28,7 +28,19 @@ The script builds the Next.js standalone server, the Swift shell (`macos/Sources
 bash macos/scripts/package-share.sh
 ```
 
-Creates `macos/dist/Spotifind.dmg` and `Spotifind.zip` (app + **How to set up Spotifind.html**). The script refuses to package if any of your keys are found inside the app. Each friend gets a **first-launch screen** asking for their own free Last.fm API key (checked with Last.fm before saving), and connects their own Spotify from the "Save to Spotify" dialog. Requirements for friends: Apple silicon Mac, macOS 14+. The app is ad-hoc signed (no paid Apple Developer ID), so the first launch needs **System Settings → Privacy & Security → Open Anyway** — the guide explains it.
+Creates `macos/dist/Spotifind.dmg` and `Spotifind.zip` (app + **How to set up Spotifind.html**). Friends don't have to set anything up:
+
+- The shared copy has **your Last.fm API key and your Spotify app's Client ID** built in (`Contents/Resources/shared.env`). Both are public identifiers, not passwords. It never contains your Spotify login, client secret, ratings or imported taste: the script checks the bundle and refuses to package if any of them slip in.
+- On first launch a friend clicks **Log in with Spotify**, approves in their browser, and Spotifind imports their taste automatically. They can also skip Spotify, or switch to their own Spotify developer app.
+- A friend's own settings (`config.env`) always override the built-in ones.
+
+**Your part: approve each friend.** Spotify's rules for personal ("development mode") apps: at most 5 people including you, and each one must be added by the owner. Spotify accepts the login of anyone you haven't added but refuses all their requests. Spotifind then tells them to send you their Spotify email. To add someone:
+
+1. Open https://developer.spotify.com/dashboard → your Spotifind app → **User Management**.
+2. Add their name and the email address of their Spotify account. Friends don't need Premium; you, as the owner, do.
+3. Check that **Settings → Redirect URIs** contains `http://127.0.0.1:47320/api/spotify/callback`.
+
+Everyone shares your app's Spotify request quota, so Spotifind uses Spotify sparingly (Deezer first for artwork) and backs off when Spotify asks it to. Friends need an Apple silicon Mac with macOS 14+. The app is ad-hoc signed (no paid Apple Developer ID), so the first launch needs **System Settings → Privacy & Security → Open Anyway**. The guide explains this.
 
 ## Run in a browser (development)
 
@@ -55,12 +67,13 @@ MusicBrainz, Cover Art Archive and Deezer need no keys. Restart the server after
 
 ### Accurate artwork and availability
 
-Last.fm's album lists include compilations, "- Single"/"- EP" re-releases and "[Enhanced]" uploads that aren't on Spotify, and Deezer doesn't carry every song in every country. So `/api/enrich` looks up every song and album on Spotify, using your connected Spotify login (or `SPOTIFY_CLIENT_SECRET` if you add one). Lookups are cached for a week.
+Last.fm's album lists include compilations, "- Single"/"- EP" re-releases and "[Enhanced]" uploads that aren't on any streaming service, and its own artwork is often missing. Every card, song row and playlist cover therefore goes through `/api/enrich`:
 
-- Recommendations (Discover, Home shelves, Playlists, Rapid-fire, genre pages) leave out anything Spotify doesn't have.
-- Covers come from Spotify first, then Deezer. Last.fm artwork is only a last resort.
-- Artists who share a name (for example the two bands called Pond) resolve to the best-known one.
-- With no Spotify login, nothing can be checked, so everything is shown as before.
+1. **Deezer** (no key, generous limits): an exact artist + title match gives the cover and the preview.
+2. **Spotify**, only for what Deezer can't find: confirms the item is on Spotify and gives its cover. Spotify's quota for personal developer apps is small, so lookups are cached for a week. When Spotify answers "rate limited, retry in N hours", Spotifind stops asking until then.
+3. **Last.fm album cover**, for songs neither service has.
+
+Recommendations (Discover, Home, Playlists, Rapid-fire, genre pages) leave out anything Spotify says it doesn't have, and anything no catalogue recognises. Failed lookups are retried, so a temporary error doesn't leave a blank cover. Artists who share a name resolve to the best-known one ("Pond" the Australian band). "The Parcels" and "Parcels" are treated as the same artist. Names in Japanese and other non-Latin scripts are matched to their romanised listing (杏里 → Anri).
 
 ### Honest limitations
 - No free API analyses the audio itself (groove, bassline, harmony). Spotifind approximates "how it sounds" with listener co-play similarity plus curated tag groups (`src/lib/recommend/tags.ts`).

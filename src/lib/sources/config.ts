@@ -23,9 +23,22 @@ export function readConfigFile(): Record<string, string> {
   }
 }
 
-/** Environment first (dev .env.local / the app passes config.env through), then the settings file. */
+/**
+ * Environment first (dev .env.local / the app passes config.env through), then the settings file, then the
+ * defaults built into a copy someone shared with you (SPOTIFIND_SHARED_<KEY>, from the bundle's shared.env).
+ */
 export function configValue(key: string): string | undefined {
-  return process.env[key] || readConfigFile()[key] || undefined;
+  return process.env[key] || readConfigFile()[key] || sharedValue(key);
+}
+
+/** A default built into a shared copy of Spotifind, e.g. the sharer's Last.fm key or Spotify Client ID. */
+export function sharedValue(key: string): string | undefined {
+  return process.env[`SPOTIFIND_SHARED_${key}`] || undefined;
+}
+
+/** Who shared this copy (shown as "ask Ethan to add you"), if it's a shared copy. */
+export function sharedBy(): string | undefined {
+  return sharedValue("SHARED_BY");
 }
 
 /** Save a setting to config.env and apply it immediately (no restart needed). */

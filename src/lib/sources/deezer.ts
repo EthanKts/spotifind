@@ -1,7 +1,7 @@
 import "server-only";
 import { fetchJson } from "./http";
 import type { Item } from "../types";
-import { itemKey, norm } from "../util";
+import { itemKey, artistKey, textKey } from "../util";
 
 const BASE = "https://api.deezer.com";
 
@@ -93,12 +93,12 @@ export async function searchArtists(query: string, limit = 10): Promise<DzArtist
 
 /** Find the Deezer track that is really this artist + title (not just a fuzzy hit). */
 function pickTrack(res: DzTrack[], artist: string, title: string) {
-  const a = norm(artist);
-  const t = norm(title);
+  const a = artistKey(artist);
+  const t = textKey(title);
   return (
-    res.find((r) => norm(r.artist.name) === a && norm(r.title) === t) ??
-    res.find((r) => norm(r.artist.name) === a && norm(r.title_short ?? r.title) === t) ??
-    res.find((r) => norm(r.artist.name) === a && (norm(r.title).startsWith(t) || t.startsWith(norm(r.title_short ?? r.title))))
+    res.find((r) => artistKey(r.artist.name) === a && textKey(r.title) === t) ??
+    res.find((r) => artistKey(r.artist.name) === a && textKey(r.title_short ?? r.title) === t) ??
+    res.find((r) => artistKey(r.artist.name) === a && (textKey(r.title).startsWith(t) || t.startsWith(textKey(r.title_short ?? r.title))))
   );
 }
 
@@ -110,11 +110,11 @@ export async function findTrack(artist: string, title: string): Promise<DzTrack 
 }
 
 function pickAlbum(res: DzAlbum[], artist: string, title: string) {
-  const a = norm(artist);
-  const t = norm(title);
+  const a = artistKey(artist);
+  const t = textKey(title);
   return (
-    res.find((r) => norm(r.artist?.name ?? "") === a && norm(r.title) === t) ??
-    res.find((r) => norm(r.artist?.name ?? "") === a && (norm(r.title).startsWith(t) || t.startsWith(norm(r.title))))
+    res.find((r) => artistKey(r.artist?.name ?? "") === a && textKey(r.title) === t) ??
+    res.find((r) => artistKey(r.artist?.name ?? "") === a && (textKey(r.title).startsWith(t) || t.startsWith(textKey(r.title))))
   );
 }
 
@@ -130,8 +130,16 @@ export async function findAlbum(artist: string, title: string): Promise<DzAlbum 
  */
 export async function findArtist(name: string): Promise<DzArtist | undefined> {
   const res = await searchArtists(name, 10);
-  const n = norm(name);
-  return res.filter((r) => norm(r.name) === n).sort((a, b) => (b.nb_fan ?? 0) - (a.nb_fan ?? 0))[0];
+  const n = artistKey(name);
+  const exact = res.filter((r) => artistKey(r.name) === n).sort((a, b) => (b.nb_fan ?? 0) - (a.nb_fan ?? 0))[0];
+  // Names in Japanese, Korean, Cyrillic…: Deezer finds the real artist by alias but lists the romanised name
+  // (杏里 → Anri, 17k fans), often next to a tiny duplicate entry under the native name. Prefer the
+  // established artist when it clearly outweighs the exact-name entry.
+  if (!/[a-z0-9]/i.test(name)) {
+    const top = res[0];
+    if (top && (top.nb_fan ?? 0) >= 100 && (top.nb_fan ?? 0) > 10 * (exact?.nb_fan ?? 0)) return top;
+  }
+  return exact;
 }
 
 export async function album(id: number): Promise<DzAlbum> {

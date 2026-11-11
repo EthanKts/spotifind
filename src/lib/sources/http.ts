@@ -33,7 +33,7 @@ const buckets: Record<string, Bucket> = {
   "musicbrainz.org": { rate: 1, burst: 1, maxConcurrent: 1, tokens: 1, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
   // Deezer: 50 requests per 5 seconds.
   "api.deezer.com": { rate: 9, burst: 20, maxConcurrent: 10, tokens: 20, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
-  "api.spotify.com": { rate: 8, burst: 10, maxConcurrent: 6, tokens: 10, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
+  "api.spotify.com": { rate: 3, burst: 6, maxConcurrent: 3, tokens: 6, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
 };
 
 function refill(b: Bucket) {
@@ -131,7 +131,7 @@ function writeCache(key: string, value: unknown, ttlSec: number) {
 // ------------------------------------------------------------------ fetch
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public retryAfter?: number) {
     super(message);
   }
 }
@@ -174,6 +174,7 @@ export async function fetchJson<T = unknown>(
         }
         if (![429, 502, 503].includes(res.status) || attempt === 2) break;
         const retryAfter = Number(res.headers.get("retry-after"));
+        if (retryAfter > 10) break; // a long ban: retrying now can't help
         await new Promise((r) => setTimeout(r, retryAfter > 0 && retryAfter < 10 ? retryAfter * 1000 : 800 * (attempt + 1)));
       }
       const total = Date.now() - queuedAt;
@@ -181,7 +182,7 @@ export async function fetchJson<T = unknown>(
         const safe = url.replace(/api_key=[^&]+/, "api_key=…");
         console.warn(`[slow] ${total}ms (waited ${startedAt - queuedAt}ms for rate limit) ${res!.status} ${safe}`);
       }
-      if (!res!.ok) throw new HttpError(res!.status, `${host} responded ${res!.status}`);
+      if (!res!.ok) throw new HttpError(res!.status, `${host} responded ${res!.status}`, Number(res!.headers.get("retry-after")) || undefined);
       const json = (await res!.json()) as T;
       // Don't persist API-level error payloads (Last.fm/Deezer return those with HTTP 200).
       const isError = !!json && typeof json === "object" && "error" in (json as object);
