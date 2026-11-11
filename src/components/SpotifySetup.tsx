@@ -8,8 +8,16 @@ export async function fetchStatus(): Promise<SpotifyStatus> {
   return fetch("/api/spotify/status", { cache: "no-store" }).then((r) => r.json());
 }
 
-/** Open Spotify's login in the browser (the Mac app hands it to your default browser), then poll until it lands. */
-export function startSpotifyLogin(returnTo: string, onConnected: (s: SpotifyStatus) => void, onTimeout: () => void) {
+/**
+ * Open Spotify's login in the browser (the Mac app hands it to your default browser), then poll until it lands.
+ * Stops early with onFailed when the browser login failed (e.g. not approved by the app's owner yet).
+ */
+export function startSpotifyLogin(
+  returnTo: string,
+  onConnected: (s: SpotifyStatus) => void,
+  onTimeout: () => void,
+  onFailed?: (e: NonNullable<SpotifyStatus["loginError"]>) => void,
+) {
   window.open(`/api/spotify/login?return=${encodeURIComponent(returnTo)}`, "_blank");
   const started = Date.now();
   const timer = setInterval(async () => {
@@ -18,6 +26,9 @@ export function startSpotifyLogin(returnTo: string, onConnected: (s: SpotifyStat
     if (s?.connected && s.canImport) {
       clearInterval(timer);
       onConnected(s);
+    } else if (s?.loginError && onFailed && Date.now() - started > 1500) {
+      clearInterval(timer);
+      onFailed(s.loginError);
     } else if (Date.now() - started > 5 * 60_000) {
       clearInterval(timer);
       onTimeout();

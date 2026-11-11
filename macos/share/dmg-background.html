@@ -1,0 +1,58 @@
+<!doctype html>
+<!-- Background of the Spotifind disk-image window (760×480 points). Rendered to PNG by package-share.sh.
+     Icon positions in macos/scripts/dmg-settings.py must match: Spotifind (200,170), Applications (470,170),
+     guide (670,170). Finder draws icon labels black in light mode and white in dark mode, so each label sits
+     on a mid-grey pill that both stay readable on. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 760px; height: 480px; overflow: hidden; }
+  body { background: #f4f4f5; color: #18181b; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; position: relative; }
+  .title { position: absolute; left: 30px; top: 26px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { position: absolute; left: 30px; top: 54px; color: #52525b; }
+  .pill { position: absolute; top: 224px; height: 22px; border-radius: 11px; background: #a1a1aa; }
+  .arrow { position: absolute; left: 268px; top: 152px; width: 134px; height: 36px; }
+  .help { position: absolute; left: 620px; top: 98px; width: 100px; text-align: center; color: #52525b; font-size: 12px; }
+  .steps { position: absolute; left: 30px; right: 30px; top: 282px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .step { background: #fff; border: 1px solid #e4e4e7; border-radius: 10px; padding: 14px 16px; height: 140px; box-sizing: border-box; }
+  .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #1ed760; color: #000; font-weight: 600; font-size: 12px; }
+  .h { font-weight: 600; margin: 8px 0 4px; }
+  .t { color: #52525b; font-size: 12px; }
+  b { color: #18181b; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="title">Install Spotifind</div>
+  <div class="sub">Three steps, about a minute.</div>
+
+  <div class="pill" style="left:140px;width:120px"></div>
+  <div class="pill" style="left:400px;width:140px"></div>
+  <div class="pill" style="left:600px;width:140px"></div>
+
+  <svg class="arrow" viewBox="0 0 134 36" fill="none" stroke="#71717a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 18h120" stroke-dasharray="2 9" />
+    <path d="M112 6l14 12-14 12" />
+  </svg>
+
+  <div class="help">Stuck? Open this</div>
+
+  <div class="steps">
+    <div class="step">
+      <span class="n">1</span>
+      <div class="h">Drag to Applications</div>
+      <div class="t">Drag the <b>Spotifind</b> icon onto the <b>Applications</b> folder above.</div>
+    </div>
+    <div class="step">
+      <span class="n">2</span>
+      <div class="h">Allow it once</div>
+      <div class="t">Open Spotifind. macOS blocks it the first time: click <b>Done</b>, then go to <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.</div>
+    </div>
+    <div class="step">
+      <span class="n">3</span>
+      <div class="h">Open it again</div>
+      <div class="t">Spotifind opens and guides you through the rest: logging in with Spotify takes one click.</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     // MARK: launch / quit
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if offerMoveToApplications() { return } // relaunching from Applications
         buildMenu()
         buildWindow()
         showSplash("Starting Spotifind…")
@@ -48,11 +49,101 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         }
     }
 
+    // MARK: move to Applications
+
+    /// Friends often open Spotifind straight from the downloaded disk image or from Downloads. macOS then runs it
+    /// from a temporary, read-only location ("App Translocation"), and it disappears when the disk image is
+    /// ejected. Offer once to copy it into Applications and relaunch from there. Returns true when relaunching.
+    private func offerMoveToApplications() -> Bool {
+        let fm = FileManager.default
+        let source = Bundle.main.bundleURL
+        let path = source.path
+        let home = fm.homeDirectoryForCurrentUser.path
+        let env = ProcessInfo.processInfo.environment
+        let targetDir = env["SPOTIFIND_MOVE_TARGET"] ?? "/Applications" // override only for testing
+        let inApplications = path.hasPrefix("/Applications/") || path.hasPrefix(home + "/Applications/") || path.hasPrefix(targetDir + "/")
+        if inApplications || UserDefaults.standard.bool(forKey: "declinedMoveToApplications") { return false }
+        // Developer builds run from macos/build; only ask for copies that look downloaded.
+        let looksDownloaded = path.hasPrefix("/Volumes/") || path.contains("/AppTranslocation/")
+            || path.hasPrefix(home + "/Downloads/") || path.hasPrefix(home + "/Desktop/")
+        if !looksDownloaded && env["SPOTIFIND_MOVE_TARGET"] == nil { return false }
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Move Spotifind to your Applications folder?"
+        alert.informativeText = "It’s running from a temporary place right now. In Applications you’ll find it in Launchpad and Spotlight, and it keeps working after you delete the download."
+        alert.addButton(withTitle: "Move to Applications")
+        alert.addButton(withTitle: "Not Now")
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            UserDefaults.standard.set(true, forKey: "declinedMoveToApplications")
+            return false
+        }
+
+        // /Applications when writable (normal admin accounts), otherwise ~/Applications.
+        var dir = URL(fileURLWithPath: targetDir, isDirectory: true)
+        if !fm.isWritableFile(atPath: dir.path) {
+            dir = URL(fileURLWithPath: home + "/Applications", isDirectory: true)
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        let target = dir.appendingPathComponent("Spotifind.app")
+        do {
+            if fm.fileExists(atPath: target.path) {
+                // An older copy: quit it if it's running, then move it to the Trash (recoverable).
+                for running in NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+                where running.bundleURL?.standardizedFileURL == target.standardizedFileURL {
+                    running.terminate()
+                }
+                Thread.sleep(forTimeInterval: 1)
+                try fm.trashItem(at: target, resultingItemURL: nil)
+            }
+            try fm.copyItem(at: source, to: target)
+        } catch {
+            let fail = NSAlert()
+            fail.messageText = "Couldn’t move Spotifind"
+            fail.informativeText = "\(error.localizedDescription)\n\nYou can drag Spotifind into Applications yourself. It still works from here."
+            fail.runModal()
+            return false
+        }
+        // You already allowed this app to open (Open Anyway); don't make macOS ask again for the copy.
+        let xattr = Process()
+        xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        xattr.arguments = ["-dr", "com.apple.quarantine", target.path]
+        try? xattr.run()
+        xattr.waitUntilExit()
+
+        // Eject the disk image it came from once this copy has quit (it can't eject while running from it).
+        if path.hasPrefix("/Volumes/") {
+            let volume = "/Volumes/" + (path.dropFirst("/Volumes/".count).split(separator: "/").first.map(String.init) ?? "")
+            let eject = Process()
+            eject.executableURL = URL(fileURLWithPath: "/bin/sh")
+            eject.arguments = ["-c", "sleep 3; /usr/bin/hdiutil detach \"$0\" -quiet", volume]
+            try? eject.run()
+        }
+        // Same bundle id as this running copy, so ask for a new instance explicitly; otherwise macOS just brings
+        // this (soon-to-quit) one to the front.
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: target, configuration: config) { _, error in
+            DispatchQueue.main.async {
+                if let error {
+                    let fail = NSAlert()
+                    fail.messageText = "Spotifind was moved to \(dir.path)"
+                    fail.informativeText = "Open it from there. (\(error.localizedDescription))"
+                    fail.runModal()
+                }
+                NSApp.terminate(nil)
+            }
+        }
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         server.stop()
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    // Only once the main window exists: the "Move to Applications" prompt shows before it, and closing that
+    // alert must not quit the app halfway through the move.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { window != nil }
 
     // MARK: window + web view
 
@@ -244,6 +335,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     @objc private func goBack() { webView.goBack() }
     @objc private func goForward() { webView.goForward() }
     @objc private func goHome() { if appLoaded { webView.load(URLRequest(url: URL(string: ServerController.origin + "/")!)) } }
+    @objc private func openSetupGuide() {
+        if appLoaded { webView.load(URLRequest(url: URL(string: ServerController.origin + "/?setup=1")!)) }
+    }
+
+    /// Shows the server log in Finder so a friend can send it to whoever shared Spotifind with them.
+    @objc private func showLog() {
+        NSWorkspace.shared.activateFileViewerSelecting([ServerController.logFile])
+    }
+
     @objc private func goTo(_ sender: NSMenuItem) {
         if appLoaded, let path = sender.representedObject as? String {
             webView.load(URLRequest(url: URL(string: ServerController.origin + path)!))
@@ -331,6 +431,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         winItem.submenu = win
         main.addItem(winItem)
         NSApp.windowsMenu = win
+
+        let helpItem = NSMenuItem()
+        let help = NSMenu(title: "Help")
+        let guide = NSMenuItem(title: "Setup Guide…", action: #selector(openSetupGuide), keyEquivalent: "")
+        guide.target = self
+        help.addItem(guide)
+        let report = NSMenuItem(title: "Report a Problem…", action: #selector(showLog), keyEquivalent: "")
+        report.target = self
+        help.addItem(report)
+        helpItem.submenu = help
+        main.addItem(helpItem)
+        NSApp.helpMenu = help
 
         NSApp.mainMenu = main
     }

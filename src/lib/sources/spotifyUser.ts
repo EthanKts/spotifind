@@ -40,6 +40,18 @@ export function usingSharedClient() {
 
 export class NotApprovedError extends Error {}
 
+// The last login that failed in the browser (e.g. a friend the owner hasn't added yet), so the app can show it
+// right away instead of waiting. Cleared when a login starts or succeeds.
+type LoginError = { message: string; notApproved: boolean; at: number };
+const ge = globalThis as unknown as { __sfLoginError?: LoginError };
+export function lastLoginError(): LoginError | undefined {
+  const e = ge.__sfLoginError;
+  return e && Date.now() - e.at < 10 * 60_000 ? e : undefined;
+}
+export function setLoginError(e: LoginError | undefined) {
+  ge.__sfLoginError = e;
+}
+
 /** Save the Client ID to config.env (and use it immediately, no restart). */
 export function setClientId(id: string) {
   setConfigValue("SPOTIFY_CLIENT_ID", id);
@@ -95,6 +107,7 @@ export function redirectUriFor(requestUrl: string) {
 }
 
 export function authorizeUrl(requestUrl: string, returnTo: string): string {
+  setLoginError(undefined);
   const id = clientId();
   if (!id) throw new Error("No Spotify Client ID configured");
   for (const [k, v] of pending) if (Date.now() - v.created > 15 * 60_000) pending.delete(k);

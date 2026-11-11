@@ -27,27 +27,28 @@
   <p class="lead">Spotifind finds new music based on what you already like, and saves the playlists you make to your Spotify. Setup takes about two minutes.</p>
 
   <div class="step">
-    <div class="num">Before you start</div>
-    <h2>Send {{SHARED_BY}} your Spotify email</h2>
-    <p>Spotify only lets {{SHARED_BY}} share Spotifind with people they’ve added. Send them the <b>email address of your Spotify account</b> (Spotify app → Settings → Account). You don’t need Spotify Premium.</p>
-  </div>
-
-  <div class="step">
     <div class="num">Step 1</div>
-    <h2>Install</h2>
-    <ol>
-      <li>Drag <b>Spotifind</b> into your <b>Applications</b> folder, then open it.</li>
-      <li>macOS will say it can’t check the app, because it isn’t from the App Store. Click <b>Done</b>.</li>
-      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to “Spotifind was blocked” and click <b>Open Anyway</b>. You only do this once.</li>
-    </ol>
-    <p class="small">If macOS says the app “is damaged”, open Terminal, paste this, press Return, and open Spotifind again:<br><code>xattr -dr com.apple.quarantine /Applications/Spotifind.app</code></p>
+    <h2>Drag Spotifind to Applications</h2>
+    <p>In the Spotifind window that opened, drag the <b>Spotifind</b> icon onto the <b>Applications</b> folder.</p>
+    <p class="small">Opened it from the download by mistake? No problem: Spotifind offers to move itself into Applications.</p>
   </div>
 
   <div class="step">
     <div class="num">Step 2</div>
-    <h2>Log in with Spotify</h2>
-    <p>Click <b>Log in with Spotify</b> on the welcome screen. Your browser opens Spotify’s page; click <b>Agree</b>, then go back to Spotifind. It learns your taste from what you listen to, and you’re ready.</p>
-    <p class="small">If the browser says you aren’t added yet, ask {{SHARED_BY}} to add your Spotify email, then click Log in with Spotify again.</p>
+    <h2>Allow it once</h2>
+    <ol>
+      <li>Open <b>Spotifind</b> from Applications (or Launchpad).</li>
+      <li>macOS says it can’t check the app, because it isn’t from the App Store. Click <b>Done</b>.</li>
+      <li>Open <b>System Settings → Privacy &amp; Security</b>, scroll down to “Spotifind was blocked” and click <b>Open Anyway</b>, then confirm with your password or Touch ID.</li>
+    </ol>
+    <p class="small">You only do this once. If macOS says the app “is damaged”, open Terminal, paste this, press Return, and open Spotifind again:<br><code>xattr -dr com.apple.quarantine /Applications/Spotifind.app</code></p>
+  </div>
+
+  <div class="step">
+    <div class="num">Step 3</div>
+    <h2>Follow the setup in the app</h2>
+    <p>Spotifind opens with a short setup: it helps you ask {{SHARED_BY}} to add your Spotify account, logs you in with Spotify (one click, no Premium needed), learns your taste, and shows you around.</p>
+    <p class="small">You can reopen it any time from <b>Help → Setup Guide…</b>. If something goes wrong, <b>Help → Report a Problem…</b> shows a log file you can send to {{SHARED_BY}}.</p>
   </div>
 
   <p class="small" style="margin-top:28px">Needs a Mac with Apple silicon (M1 or newer) and macOS 14 or later. Your Spotify login stays on your Mac.</p>

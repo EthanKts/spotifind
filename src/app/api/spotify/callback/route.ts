@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { completeLogin, NotApprovedError } from "@/lib/sources/spotifyUser";
+import { completeLogin, NotApprovedError, setLoginError } from "@/lib/sources/spotifyUser";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const err = q.get("error");
   if (err) {
+    setLoginError({ message: err === "access_denied" ? "You cancelled the Spotify login." : `Spotify said: ${err}`, notApproved: false, at: Date.now() });
     return page("Spotify login cancelled", `Spotify said: ${esc(err)}. You can close this tab and try again from Spotifind.`, false);
   }
   try {
@@ -31,7 +32,8 @@ export async function GET(req: NextRequest) {
       true,
     );
   } catch (e) {
-    if (e instanceof NotApprovedError) return page("Almost there", esc(e.message), false);
+    setLoginError({ message: (e as Error).message, notApproved: e instanceof NotApprovedError, at: Date.now() });
+    if (e instanceof NotApprovedError) return page("Almost there", `${esc(e.message)}<br><br>You can close this tab — Spotifind shows what to do next.`, false);
     return page("Couldn't connect to Spotify", esc((e as Error).message), false);
   }
 }

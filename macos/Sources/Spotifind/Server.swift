@@ -23,7 +23,7 @@ final class ServerController {
 
     static var configFile: URL { supportDir.appendingPathComponent("config.env") }
 
-    private static var logFile: URL {
+    static var logFile: URL {
         let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Logs/Spotifind", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

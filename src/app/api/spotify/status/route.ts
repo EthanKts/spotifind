@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { clientId, connectedUser, grantedScopes, redirectUriFor, TOP_READ_SCOPE, usingSharedClient } from "@/lib/sources/spotifyUser";
+import { clientId, connectedUser, grantedScopes, lastLoginError, redirectUriFor, TOP_READ_SCOPE, usingSharedClient } from "@/lib/sources/spotifyUser";
 import { sharedBy } from "@/lib/sources/config";
 
 export interface SpotifyStatus {
@@ -12,6 +12,8 @@ export interface SpotifyStatus {
   shared: boolean;
   /** Who shared this copy, for "ask Ethan to add you". */
   sharedBy?: string;
+  /** A login that just failed in the browser (not approved yet, cancelled…). */
+  loginError?: { message: string; notApproved: boolean };
   /** The exact Redirect URI to register in the Spotify developer dashboard. */
   redirectUri: string;
 }
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
     canImport: !!user && grantedScopes().includes(TOP_READ_SCOPE),
     shared: usingSharedClient(),
     sharedBy: sharedBy(),
+    loginError: user ? undefined : lastLoginError(),
     redirectUri: redirectUriFor(req.url),
   } satisfies SpotifyStatus);
 }

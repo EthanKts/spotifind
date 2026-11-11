@@ -1,6 +1,6 @@
 #!/bin/bash
-# Builds a shareable copy of Spotifind for friends: macos/dist/Spotifind.dmg and macos/dist/Spotifind.zip,
-# each with the app + "How to set up Spotifind.html".
+# Builds a shareable copy of Spotifind for friends: macos/dist/Spotifind.dmg (a styled window: drag to
+# Applications + the 3 install steps) and macos/dist/Spotifind.zip, each with the app + "Setup Guide.html".
 #
 # Friends get zero setup: the copy carries YOUR Last.fm API key and YOUR Spotify app's Client ID (both are
 # public identifiers, not passwords), so they just click "Log in with Spotify". It never carries your
@@ -70,17 +70,38 @@ echo "OK — only your Last.fm key and Spotify Client ID (in Resources/shared.en
 echo "==> Packaging"
 rm -rf "$DIST"
 mkdir -p "$DIST"
-STAGE="$(mktemp -d)/Spotifind"
+WORK="$(mktemp -d)"
+GUIDE_OUT="$WORK/Setup Guide.html"
+sed "s/{{SHARED_BY}}/$NAME/g" "$GUIDE" > "$GUIDE_OUT"
+
+# Disk-image window background (1x + 2x for Retina), rendered with headless Chrome like the app icon.
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+[ -x "$CHROME" ] || { echo "Google Chrome is needed to render the disk-image background" >&2; exit 1; }
+for scale in 1 2; do
+  PROFILE="$(mktemp -d)"
+  "$CHROME" --headless=new --user-data-dir="$PROFILE" --disable-gpu --hide-scrollbars --force-device-scale-factor=$scale \
+    --window-size=760,480 --screenshot="$WORK/bg@${scale}x.png" "file://$MAC/share/dmg-background.html" >/dev/null 2>&1
+  rm -rf "$PROFILE"
+done
+tiffutil -cathidpicheck "$WORK/bg@1x.png" "$WORK/bg@2x.png" -out "$WORK/background.tiff" >/dev/null
+
+# dmgbuild lays out the window (background, icon positions) without scripting Finder.
+VENV="$MAC/build/.venv-dmg"
+if [ ! -x "$VENV/bin/dmgbuild" ]; then
+  echo "==> Installing dmgbuild (once, into $VENV)"
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q dmgbuild==1.6.5
+fi
+"$VENV/bin/dmgbuild" -s "$MAC/scripts/dmg-settings.py" \
+  -D app="$APP" -D guide="$GUIDE_OUT" -D background="$WORK/background.tiff" \
+  "Spotifind" "$DIST/Spotifind.dmg"
+
+# Zip (for sharing via Drive/email): app + guide.
+STAGE="$WORK/Spotifind"
 mkdir -p "$STAGE"
 ditto "$APP" "$STAGE/Spotifind.app"
-sed "s/{{SHARED_BY}}/$NAME/g" "$GUIDE" > "$STAGE/How to set up Spotifind.html"
-ln -s /Applications "$STAGE/Applications"
-
-hdiutil create -quiet -volname "Spotifind" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DIST/Spotifind.dmg"
-
-# Zip (for sharing via Drive/email): app + guide, no Applications shortcut.
-rm "$STAGE/Applications"
-(cd "$(dirname "$STAGE")" && ditto -c -k --sequesterRsrc --keepParent "Spotifind" "$DIST/Spotifind.zip")
+cp "$GUIDE_OUT" "$STAGE/"
+(cd "$WORK" && ditto -c -k --sequesterRsrc --keepParent "Spotifind" "$DIST/Spotifind.zip")
 
 ls -lh "$DIST"
 cat <<MSG

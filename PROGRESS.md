@@ -113,3 +113,11 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] New setup guide + packaging script with leak checks
 - [x] Fix invisible headings (text-base clashed with the "base" color)
 - [x] Rebuild app + share package and test
+
+## Guided install for friends (round 12)
+- [x] Styled download window with 1-2-3 instructions
+- [x] "Move to Applications" prompt on first launch
+- [x] Login errors reported back to the app (not-approved friends)
+- [x] Step-by-step setup wizard with progress and quick tour
+- [x] Help menu: Setup Guide + Report a problem
+- [x] Guide, README, rebuild and test

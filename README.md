@@ -28,10 +28,23 @@ The script builds the Next.js standalone server, the Swift shell (`macos/Sources
 bash macos/scripts/package-share.sh
 ```
 
-Creates `macos/dist/Spotifind.dmg` and `Spotifind.zip` (app + **How to set up Spotifind.html**). Friends don't have to set anything up:
+Creates `macos/dist/Spotifind.dmg` and `Spotifind.zip` (app + **Setup Guide.html**). Installing is guided end to end:
+
+1. **The download window explains itself.** The .dmg opens to a styled window: the app, an arrow to Applications, and the three install steps (drag to Applications → allow it once under *Privacy & Security → Open Anyway* → open it again). The layout is built with `dmgbuild` (installed once into `macos/build/.venv-dmg`) from `macos/share/dmg-background.html` and `macos/scripts/dmg-settings.py`.
+2. **Opened from the download by mistake?** Spotifind offers to move itself into Applications, then relaunches from there and ejects the disk image.
+3. **A setup wizard on first launch** (`src/components/Welcome.tsx`), 5 steps with a progress bar, Back and Skip:
+   - Welcome.
+   - Ask the person who shared it to add you, with a ready-to-copy message.
+   - Log in with Spotify. If the login fails (for example, you haven't added them yet), the app shows why straight away, with a **Try again** button.
+   - Learning your taste: it shows the artists it found.
+   - A quick tour of the app.
+   Progress survives a restart. **Help → Setup Guide…** reopens it, and **Help → Report a Problem…** shows the log file to send you.
+
+The only step the app can't guide is macOS's one-time "Open Anyway". Removing it would need a paid Apple Developer ID ($99/year) to notarize the app.
+
+Friends don't have to set up any keys:
 
 - The shared copy has **your Last.fm API key and your Spotify app's Client ID** built in (`Contents/Resources/shared.env`). Both are public identifiers, not passwords. It never contains your Spotify login, client secret, ratings or imported taste: the script checks the bundle and refuses to package if any of them slip in.
-- On first launch a friend clicks **Log in with Spotify**, approves in their browser, and Spotifind imports their taste automatically. They can also skip Spotify, or switch to their own Spotify developer app.
 - A friend's own settings (`config.env`) always override the built-in ones.
 
 **Your part: approve each friend.** Spotify's rules for personal ("development mode") apps: at most 5 people including you, and each one must be added by the owner. Spotify accepts the login of anyone you haven't added but refuses all their requests. Spotifind then tells them to send you their Spotify email. To add someone:
