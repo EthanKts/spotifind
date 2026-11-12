@@ -183,3 +183,6 @@ src/lib/recommend/  candidates, score, explain, tags
 src/lib/taste/      profile store (ratings) + imported Spotify taste
 src/lib/client/     data hooks (enrichment, years, JSON cache), player store
 ```
+
+## Credits
+BPM and key data provided by [GetSongBPM](https://getsongbpm.com)
