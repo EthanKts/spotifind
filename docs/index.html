@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spotifind</title>
+<meta name="description" content="Spotifind is a Mac app for music discovery that explains why every recommendation matches.">
+<style>
+  :root { color-scheme: dark; --bg: #111113; --panel: #18181b; --line: #2a2a2f; --ink: #f4f4f5; --sub: #a1a1aa; --mute: #71717a; --green: #1ed760; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", sans-serif; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  main { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 96px 20px 48px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo span { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+  .logo b { color: var(--green); font-weight: 600; }
+  p.lead { margin: 20px 0 0; color: var(--sub); font-size: 18px; }
+  ul { margin: 28px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  li { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 12px 14px; color: var(--sub); font-size: 15px; }
+  li strong { color: var(--ink); font-weight: 600; }
+  .actions { margin-top: 28px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 6px; background: var(--green); color: #000; font-weight: 500; font-size: 15px; text-decoration: none; }
+  .btn:hover { background: #3be477; }
+  footer { border-top: 1px solid var(--line); padding: 20px; text-align: center; color: var(--mute); font-size: 14px; }
+  footer a, .note a { color: var(--ink); }
+  .note { margin-top: 16px; color: var(--mute); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="logo">
+    <svg width="32" height="32" viewBox="0 0 40 40" aria-hidden="true"><path d="M27.5 11.2A11 11 0 1 0 29 22.4" fill="none" stroke="#1ed760" stroke-width="3.6" stroke-linecap="round"/><circle cx="29.6" cy="16.6" r="1.9" fill="#1ed760"/><path d="M26.2 26.2 34 34" stroke="#1ed760" stroke-width="4.2" stroke-linecap="round"/><path d="M18.5 10.5c.5 3.6 1.9 5 5.5 5.5-3.6.5-5 1.9-5.5 5.5-.5-3.6-1.9-5-5.5-5.5 3.6-.5 5-1.9 5.5-5.5Z" fill="#fff"/></svg>
+    <span>Spoti<b>find</b></span>
+  </div>
+
+  <p class="lead">
+    Spotifind is a Mac app for music discovery. Pick a song, album, artist or genre and it finds music that sounds like it,
+    and every recommendation comes with a short “why it matches” explanation, from shared listeners to groove, mood and energy.
+  </p>
+
+  <ul>
+    <li><strong>Rapid-fire</strong>: rate songs one at a time with 30-second previews; every rating sharpens what comes next.</li>
+    <li><strong>Playlists</strong>: build one in the style, energy and length you want, then save it to Spotify.</li>
+    <li><strong>Explore a genre</strong>: find songs you’ll like even in a genre you don’t usually listen to.</li>
+  </ul>
+
+  <div class="actions">
+    <a class="btn" href="https://github.com/EthanKts/spotifind">View on GitHub</a>
+  </div>
+  <p class="note">For Apple silicon Macs running macOS 14 or later.</p>
+</main>
+<footer>
+  BPM and key data provided by <a href="https://getsongbpm.com">GetSongBPM</a>
+</footer>
+</body>
+</html>
