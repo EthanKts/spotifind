@@ -12,12 +12,12 @@ import { itemKey, norm } from "../util";
 /** quick = similarity only, no tags (≈2–3 requests, shown instantly); lite = + artist tags; full = + deep cuts, second hop. */
 export type Depth = "full" | "lite" | "quick";
 
-type Pool = Map<string, Candidate>;
+export type Pool = Map<string, Candidate>;
 
 // Fan-made edits that pile up on Last.fm with few plays — they'd otherwise pass as "hidden gems".
 const NOVELTY_EDIT = /\b(nightcore|sped[\s-]?up|slowed\s*(?:\+|&|and)?\s*reverb|8d audio|karaoke|tiktok (?:version|remix)|bass ?boosted|ringtone)\b|\((?:slowed|sped up)\)/i;
 
-function add(pool: Pool, c: Candidate) {
+export function add(pool: Pool, c: Candidate) {
   if (NOVELTY_EDIT.test(c.title)) return;
   const prev = pool.get(c.key);
   if (!prev) {
@@ -36,7 +36,7 @@ function add(pool: Pool, c: Candidate) {
   pool.set(c.key, merged);
 }
 
-function trackCand(
+export function trackCand(
   t: lf.LfTrack,
   seedArtist: string,
   extra: Partial<Candidate> & { source: Candidate["source"]; hop: 1 | 2 },
@@ -59,7 +59,7 @@ function trackCand(
 }
 
 /** Fill tag vectors: per-item tags for the strongest candidates, artist tags for the rest. */
-async function attachTags(pool: Pool, depth: Depth) {
+export async function attachTags(pool: Pool, depth: Depth) {
   const all = [...pool.values()];
   const strength = (c: Candidate) => (c.match ?? (c.artistMatch ?? 0) * 0.6) / c.hop;
 

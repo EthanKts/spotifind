@@ -98,3 +98,15 @@ export function hrefFor(kind: Kind, artist: string, title: string) {
   if (kind === "artist") return artistHref(artist);
   return trackHref(artist, title);
 }
+
+/** Title without anything in brackets or after " - " ("Song (feat. X)", "Song - 2011 Remaster" → "song"). */
+function bareTitle(t: string) {
+  return norm(t.replace(/\s*[\(\[].*?[\)\]]/g, "").replace(/\s+-\s+.*$/, "")) || t.trim().toLowerCase();
+}
+
+/** Matcher for songs already in a list (e.g. a pasted playlist), including remaster and "feat." variants. */
+export function songMatcher(tracks: { artist: string; title: string }[]): (c: { artist: string; title: string; key?: string }) => boolean {
+  const keys = new Set(tracks.map((t) => itemKey("track", t.artist, t.title)));
+  const loose = new Set(tracks.map((t) => `${norm(t.artist)}|${bareTitle(t.title)}`));
+  return (c) => keys.has(c.key ?? itemKey("track", c.artist, c.title)) || loose.has(`${norm(c.artist)}|${bareTitle(c.title)}`);
+}

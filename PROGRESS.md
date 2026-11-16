@@ -154,3 +154,8 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] Read public playlists from a link (embed page, no quota; full list via API for your own)
 - [x] "A Spotify playlist" basis: similar songs not in it, all filters apply
 - [x] Docs, rebuild app, test
+
+## Whole playlist + button fix (round 17)
+- [x] Build from every song of a pasted playlist (not a sample of 8)
+- [x] Create button no longer stuck loading after making a playlist
+- [x] Docs, rebuild app, test, push

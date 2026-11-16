@@ -12,7 +12,7 @@ import { getFeatures, unmeasured } from "./features";
 import { displayScore, explain } from "../recommend/explain";
 import type { Playlist, PlaylistSettings, PlaylistSource, Profile } from "../taste/profile";
 import { recommendUrl } from "./data";
-import { itemKey, norm } from "../util";
+import { itemKey, norm, songMatcher } from "../util";
 import { genreNames, genresOf, resolveGenre } from "../recommend/genres";
 
 export const PLAYLIST_LENGTH = 15;
@@ -203,37 +203,36 @@ export async function fetchPool(seeds: PlaylistSettings["seeds"], depth: "lite" 
   };
 }
 
-/**
- * Representative songs of a pasted playlist to build from (all of it would be far too slow): first one song from
- * each of its most-represented artists, so its core sound leads, then songs spread evenly through the rest.
- */
-export function playlistSeeds(src: PlaylistSource, n = 8): PlaylistSettings["seeds"] {
-  const count = new Map<string, number>();
-  for (const t of src.tracks) count.set(norm(t.artist), (count.get(norm(t.artist)) ?? 0) + 1);
-  const out: PlaylistSource["tracks"] = [];
-  const used = new Set<string>();
-  const take = (t: PlaylistSource["tracks"][number]) => {
-    const a = norm(t.artist);
-    if (used.has(a) || out.length >= n) return;
-    used.add(a);
-    out.push(t);
-  };
-  const regulars = [...count].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, Math.ceil(n / 2));
-  for (const [a] of regulars) take(src.tracks.find((t) => norm(t.artist) === a)!);
-  for (let i = 0; i < n; i++) take(src.tracks[Math.floor(((i + 0.5) * src.tracks.length) / n)]);
-  for (const t of src.tracks) take(t); // short or single-artist playlists
-  return out.map((t) => ({ kind: "track" as const, artist: t.artist, title: t.title }));
+/** The playlist's most frequent artists, used where a few "picks" are needed (instrument bridges, labels). */
+export function playlistArtists(src: PlaylistSource, n = 5): PlaylistSettings["seeds"] {
+  const count = new Map<string, { artist: string; n: number }>();
+  for (const t of src.tracks) {
+    const e = count.get(norm(t.artist)) ?? { artist: t.artist, n: 0 };
+    e.n++;
+    count.set(norm(t.artist), e);
+  }
+  return [...count.values()].sort((a, b) => b.n - a.n).slice(0, n).map((a) => ({ kind: "artist" as const, artist: a.artist, title: a.artist }));
 }
 
-/** Title without anything in brackets or after " - " ("Song (feat. X)", "Song - 2011 Remaster" → "song"). */
-const bareTitle = (t: string) => norm(t.replace(/\s*[\(\[].*?[\)\]]/g, "").replace(/\s+-\s+.*$/, "")) || t.trim().toLowerCase();
+/** Songs like the whole pasted playlist (every song counts; see recommend/playlist.ts). */
+export async function fetchPlaylistPool(src: PlaylistSource, depth: "lite" | "full"): Promise<Pool> {
+  const res = await fetch("/api/recommend/playlist", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: src.id, name: src.name, tracks: src.tracks, depth }),
+  })
+    .then((r) => r.json() as Promise<RecommendResponse & { support?: Record<string, number> }>)
+    .catch(() => null);
+  return {
+    candidates: (res?.candidates ?? []).filter((c) => c.kind === "track"),
+    seed: res?.seed ?? null,
+    support: new Map(Object.entries(res?.support ?? {})),
+  };
+}
 
-/** Matcher for songs already in the pasted playlist, so the new playlist only has songs that aren't. */
-function inSource(src: PlaylistSource | undefined): (c: { artist: string; title: string; key: string }) => boolean {
-  if (!src) return () => false;
-  const keys = new Set(src.tracks.map((t) => itemKey("track", t.artist, t.title)));
-  const loose = new Set(src.tracks.map((t) => `${norm(t.artist)}|${bareTitle(t.title)}`));
-  return (c) => keys.has(c.key) || loose.has(`${norm(c.artist)}|${bareTitle(c.title)}`);
+/** "all 150 songs" / "the first 100 of 150 songs" */
+export function sourceSongs(src: Pick<PlaylistSource, "tracks" | "total">) {
+  return src.tracks.length < src.total ? `the first ${src.tracks.length} of ${src.total} songs` : `all ${src.tracks.length} songs`;
 }
 
 export type GenerateResult = Pick<Playlist, "tracks" | "alternates" | "reasons" | "scores"> & {
@@ -249,7 +248,7 @@ export async function generatePlaylist(
 ): Promise<GenerateResult> {
   const fromPlaylist = settings.basis === "playlist";
   if (fromPlaylist && !settings.source?.tracks.length) throw new Error("Paste a Spotify playlist link to build from.");
-  if (!settings.seeds.length) throw new Error("Pick something to build the playlist from.");
+  if (!fromPlaylist && !settings.seeds.length) throw new Error("Pick something to build the playlist from.");
   const n = playlistLength(settings);
   // Deep Cuts / Explore Further need the full pass (deep catalogue + second hop); long playlists need its bigger pool.
   const depth = settings.mode === "deep" || settings.mode === "explore" || n > 25 ? "full" : "lite";
@@ -260,34 +259,33 @@ export async function generatePlaylist(
     genres.length
       ? `Finding ${genreNames(genres)} you might like…`
       : fromPlaylist
-        ? `Finding songs like ${settings.seeds.length} songs from ${settings.source!.name}…`
+        ? `Reading ${sourceSongs(settings.source!)} of ${settings.source!.name}… (up to a minute the first time)`
         : `Gathering recommendations from ${settings.seeds.map(seedName).join(", ")}…`,
   );
   const instruments = settings.instruments ?? [];
   const [{ candidates: base, seed, support }, extraInstr] = await Promise.all([
-    genres.length ? fetchGenrePool(genres, settings.seeds, taste, depth) : fetchPool(settings.seeds, depth),
+    genres.length
+      ? fetchGenrePool(genres, settings.seeds, taste, depth)
+      : fromPlaylist
+        ? fetchPlaylistPool(settings.source!, depth)
+        : fetchPool(settings.seeds, depth),
     instruments.length ? instrumentCandidates(instruments, settings.seeds, taste, "lite") : Promise.resolve([] as Candidate[]),
   ]);
-  let pool = base;
-  if (fromPlaylist && base.length < n * 3) {
-    // Few song-level matches (titles Last.fm doesn't know, very new releases): add the playlist's main artists.
-    onProgress?.("Widening the search with the playlist's artists…");
-    const artists = [...new Set(settings.source!.tracks.map((t) => t.artist))].slice(0, 5).map((a) => ({ kind: "artist" as const, artist: a, title: a }));
-    const more = await fetchPool(artists, depth);
-    const seen = new Set(base.map((c) => c.key));
-    pool = [...base, ...more.candidates.filter((c) => !seen.has(c.key))];
-    for (const [k, v] of more.support) support.set(k, (support.get(k) ?? 0) + v);
-  }
+  const pool = base;
   const have = new Set(pool.map((c) => c.key));
   const all = [...pool, ...extraInstr.filter((c) => !have.has(c.key) && (have.add(c.key), true))];
-  const original = inSource(settings.source);
+  const original = settings.source ? songMatcher(settings.source.tracks) : () => false;
   const candidates = all.filter((c) => !(settings.skipRated && ratedKeys.has(c.key)) && !original(c));
   if (!candidates.length) throw new Error("Not enough recommendation data for these picks yet — try another seed or style.");
 
   onProgress?.(`Ranking ${candidates.length} songs for ${modeLabel(settings.mode)}…`);
   const rankWith = (perArtist: number) =>
     rank(candidates, seed, settings.mode as Mode, settings.adventure, taste, { kind: "track", perArtist })
-      .map((r) => ({ r, s: r.score + 0.06 * ((support.get(r.c.key) ?? 1) - 1) }))
+      // Songs several seeds lead to rank higher. A playlist has dozens of "seeds", so its boost grows slowly.
+      .map((r) => {
+        const k = support.get(r.c.key) ?? 1;
+        return { r, s: r.score + (fromPlaylist ? 0.08 * Math.log2(k) : 0.06 * (k - 1)) };
+      })
       .sort((a, b) => b.s - a.s)
       .map((x) => x.r);
   let ranked = rankWith(settings.perArtist);

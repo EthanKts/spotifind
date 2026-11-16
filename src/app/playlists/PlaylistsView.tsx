@@ -9,7 +9,7 @@ import type { Kind } from "@/lib/types";
 import { MODES, type Mode } from "@/lib/recommend/score";
 import { taste, useProfile, useTasteInput, type PlaylistSettings, type PlaylistSource } from "@/lib/taste/profile";
 import { useImported } from "@/lib/taste/imported";
-import { basisLabel, defaultName, generatePlaylist, LENGTH_CHOICES, modeLabel, newId, PLAYLIST_LENGTH, playlistSeeds, seedName, tasteSeeds } from "@/lib/client/playlist";
+import { basisLabel, defaultName, generatePlaylist, LENGTH_CHOICES, modeLabel, newId, PLAYLIST_LENGTH, playlistArtists, seedName, sourceSongs, tasteSeeds } from "@/lib/client/playlist";
 import { BasisPicker, ShapeControls, type Basis, type Picked } from "@/components/BuildControls";
 import { PlaylistCover } from "@/components/Sidebar";
 import { PageHeader } from "@/components/Cards";
@@ -73,13 +73,14 @@ export function PlaylistsView() {
 
   // For a genre, your favourites are the bridge into it.
   const seeds = useMemo(
-    () => (basis === "seed" ? picked.map((x) => x.s) : basis === "playlist" ? (source ? playlistSeeds(source) : []) : mySeeds),
+    () => (basis === "seed" ? picked.map((x) => x.s) : basis === "playlist" ? (source ? playlistArtists(source) : []) : mySeeds),
     [basis, picked, source, mySeeds],
   );
   const ready = basis === "genre" ? genres.length > 0 : basis === "playlist" ? !!source && seeds.length > 0 : seeds.length > 0;
   const pct = Math.round(adventure * 100);
 
   async function create() {
+    if (busy) return;
     setError(null);
     const settings: PlaylistSettings = {
       basis, seeds, mode, adventure, perArtist: oneEach ? 1 : 2, skipRated, previewsOnly, length,
@@ -107,6 +108,9 @@ export function PlaylistsView() {
       router.push(`/playlist?id=${id}`);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      // Always clear, also after success: Next keeps this page's state alive in the background, so a
+      // leftover "busy" would leave the button spinning when you come back to make another playlist.
       setBusy(null);
     }
   }
@@ -220,7 +224,7 @@ export function PlaylistsView() {
               {basis === "genre"
                 ? `${genreNames(genres)}, matched to your taste`
                 : basis === "playlist" && source
-                  ? `${source.name} (new songs only, built from ${seeds.length} of its songs)`
+                  ? `${sourceSongs(source)} of ${source.name}, new songs only`
                   : seeds.map(seedName).join(", ")}
               {energy != null && ` · energy ${Math.round(energy * 100)}`}
               {instruments.length > 0 && ` · ${instruments.length} instrument${instruments.length > 1 ? "s" : ""}`}
