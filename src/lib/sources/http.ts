@@ -130,6 +130,11 @@ function readCache(key: string): unknown | undefined {
   }
 }
 
+/** Store a value computed outside fetchJson (e.g. parsed from a web page) in the same two-level cache. */
+export function storeCache(key: string, value: unknown, ttlSec: number) {
+  writeCache(key, value, ttlSec);
+}
+
 function writeCache(key: string, value: unknown, ttlSec: number) {
   const exp = Date.now() + ttlSec * 1000;
   if (memory.size > MAX_MEMORY) memory.delete(memory.keys().next().value as string);

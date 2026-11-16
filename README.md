@@ -109,6 +109,7 @@ Recommendations (Discover, Home, Playlists, Rapid-fire, genre pages) leave out a
    - *From my taste*: blends your 3 top-rated songs/artists. Songs suggested by several of them rank higher.
    - *Songs, albums or artists*: combine **up to 5** picks for a more precise result. Songs that several picks lead to rank higher.
    - *Genres, matched to my taste*: pick **up to 5** precise genres (see below).
+   - *A Spotify playlist*: paste a playlist link (Share → Copy link to playlist) to get **similar songs that aren't in it**. All the options below still apply. Spotifind builds from 8 representative songs: one from each of the playlist's most-repeated artists, then songs spread through the rest. Songs several of them lead to rank higher. Anything already in the playlist is left out, including remaster and "feat." variants. If there are few song-level matches, the playlist's main artists widen the search. The songs come from Spotify's public embed player page, with no login and no API quota. That page lists the first 100 songs. Since Spotify's February 2026 API changes, the API only returns the songs of playlists you own or collaborate on, so a longer playlist is read in full only when it's yours and you're connected. See `src/lib/sources/spotifyPlaylist.ts` and `/api/spotify/playlist`. `/playlists?from=<link>` opens it pre-filled.
 
    Discover's button pre-fills it with the current style.
 2. **Style:** Closest Match, Deep Cuts, Hidden Gems, Same Groove, Same Mood or Explore Further, plus the Very Similar ↔ More Adventurous slider.

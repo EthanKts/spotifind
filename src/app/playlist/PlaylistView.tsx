@@ -116,7 +116,12 @@ export function PlaylistView() {
             </button>
           )}
           <p className="mt-2 text-[13px] text-sub">
-            Built from {pl.settings.basis === "taste" ? `your taste (${pl.settings.seeds.map(seedName).join(", ")})` : pl.seedLabel} · {pl.tracks.length}{" "}
+            Built from{" "}
+            {pl.settings.basis === "taste"
+              ? `your taste (${pl.settings.seeds.map(seedName).join(", ")})`
+              : pl.settings.basis === "playlist"
+                ? `songs like ${pl.settings.source?.name ?? "a Spotify playlist"}`
+                : pl.seedLabel} · {pl.tracks.length}{" "}
             songs{(pl.settings.length ?? 15) > pl.tracks.length ? ` (asked for ${pl.settings.length} — that's all that fit ${modeLabel(pl.settings.mode)})` : ""}
             {totalSec ? `, about ${Math.round(totalSec / 60)} min` : ""}
           </p>

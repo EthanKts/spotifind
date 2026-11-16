@@ -37,9 +37,21 @@ export interface Rating extends Entry {
   ctx?: RatingContext;
 }
 
+export interface PlaylistSource {
+  id: string;
+  name: string;
+  image?: string;
+  /** Songs in the playlist on Spotify (tracks may be fewer for long playlists that aren't yours). */
+  total: number;
+  tracks: { artist: string; title: string }[];
+}
+
 export interface PlaylistSettings {
-  /** taste = your favourites · seed = 1–5 songs/albums/artists you picked · genre = a genre matched to your taste */
-  basis: "taste" | "seed" | "genre";
+  /** taste = your favourites · seed = 1–5 songs/albums/artists you picked · genre = a genre matched to your taste ·
+   *  playlist = new songs like a Spotify playlist you pasted the link of */
+  basis: "taste" | "seed" | "genre" | "playlist";
+  /** For "playlist": the pasted playlist (kept so swaps and labels work without fetching it again). */
+  source?: PlaylistSource;
   /** For "genre", your favourites (used to find bridge artists into the genre). */
   seeds: { kind: Item["kind"]; artist: string; title: string }[];
   /** Up to 5 subgenre ids (recommend/genres.ts) for basis "genre". */

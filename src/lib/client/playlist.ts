@@ -10,9 +10,9 @@ import { applyShape, shapeActive, type Shape } from "../recommend/shape";
 import { INSTRUMENTS } from "../recommend/tags";
 import { getFeatures, unmeasured } from "./features";
 import { displayScore, explain } from "../recommend/explain";
-import type { Playlist, PlaylistSettings, Profile } from "../taste/profile";
+import type { Playlist, PlaylistSettings, PlaylistSource, Profile } from "../taste/profile";
 import { recommendUrl } from "./data";
-import { itemKey } from "../util";
+import { itemKey, norm } from "../util";
 import { genreNames, genresOf, resolveGenre } from "../recommend/genres";
 
 export const PLAYLIST_LENGTH = 15;
@@ -49,8 +49,9 @@ export function seedName(s: PlaylistSettings["seeds"][number]) {
 }
 
 /** What a playlist / session was built from, for labels: "your taste", "jazz for you", "Chameleon + 2 more". */
-export function basisLabel(s: Pick<PlaylistSettings, "basis" | "seeds" | "genre" | "genres">) {
+export function basisLabel(s: Pick<PlaylistSettings, "basis" | "seeds" | "genre" | "genres" | "source">) {
   if (s.basis === "taste") return "your taste";
+  if (s.basis === "playlist") return `like ${s.source?.name ?? "a Spotify playlist"}`;
   if (s.basis === "genre") return `${genreNames(genresOf(s)) || "a genre"} for you`;
   if (!s.seeds.length) return "";
   return s.seeds.length === 1 ? seedName(s.seeds[0]) : `${seedName(s.seeds[0])} + ${s.seeds.length - 1} more`;
@@ -202,6 +203,39 @@ export async function fetchPool(seeds: PlaylistSettings["seeds"], depth: "lite" 
   };
 }
 
+/**
+ * Representative songs of a pasted playlist to build from (all of it would be far too slow): first one song from
+ * each of its most-represented artists, so its core sound leads, then songs spread evenly through the rest.
+ */
+export function playlistSeeds(src: PlaylistSource, n = 8): PlaylistSettings["seeds"] {
+  const count = new Map<string, number>();
+  for (const t of src.tracks) count.set(norm(t.artist), (count.get(norm(t.artist)) ?? 0) + 1);
+  const out: PlaylistSource["tracks"] = [];
+  const used = new Set<string>();
+  const take = (t: PlaylistSource["tracks"][number]) => {
+    const a = norm(t.artist);
+    if (used.has(a) || out.length >= n) return;
+    used.add(a);
+    out.push(t);
+  };
+  const regulars = [...count].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, Math.ceil(n / 2));
+  for (const [a] of regulars) take(src.tracks.find((t) => norm(t.artist) === a)!);
+  for (let i = 0; i < n; i++) take(src.tracks[Math.floor(((i + 0.5) * src.tracks.length) / n)]);
+  for (const t of src.tracks) take(t); // short or single-artist playlists
+  return out.map((t) => ({ kind: "track" as const, artist: t.artist, title: t.title }));
+}
+
+/** Title without anything in brackets or after " - " ("Song (feat. X)", "Song - 2011 Remaster" → "song"). */
+const bareTitle = (t: string) => norm(t.replace(/\s*[\(\[].*?[\)\]]/g, "").replace(/\s+-\s+.*$/, "")) || t.trim().toLowerCase();
+
+/** Matcher for songs already in the pasted playlist, so the new playlist only has songs that aren't. */
+function inSource(src: PlaylistSource | undefined): (c: { artist: string; title: string; key: string }) => boolean {
+  if (!src) return () => false;
+  const keys = new Set(src.tracks.map((t) => itemKey("track", t.artist, t.title)));
+  const loose = new Set(src.tracks.map((t) => `${norm(t.artist)}|${bareTitle(t.title)}`));
+  return (c) => keys.has(c.key) || loose.has(`${norm(c.artist)}|${bareTitle(c.title)}`);
+}
+
 export type GenerateResult = Pick<Playlist, "tracks" | "alternates" | "reasons" | "scores"> & {
   /** Shown to you once, e.g. when the instrument filter had to be relaxed. Not saved. */
   note?: string;
@@ -213,6 +247,8 @@ export async function generatePlaylist(
   ratedKeys: Set<string>,
   onProgress?: (msg: string) => void,
 ): Promise<GenerateResult> {
+  const fromPlaylist = settings.basis === "playlist";
+  if (fromPlaylist && !settings.source?.tracks.length) throw new Error("Paste a Spotify playlist link to build from.");
   if (!settings.seeds.length) throw new Error("Pick something to build the playlist from.");
   const n = playlistLength(settings);
   // Deep Cuts / Explore Further need the full pass (deep catalogue + second hop); long playlists need its bigger pool.
@@ -220,15 +256,32 @@ export async function generatePlaylist(
 
   const genres = settings.basis === "genre" ? genresOf(settings) : [];
   if (settings.basis === "genre" && !genres.length) throw new Error("Pick a genre to explore.");
-  onProgress?.(genres.length ? `Finding ${genreNames(genres)} you might like…` : `Gathering recommendations from ${settings.seeds.map(seedName).join(", ")}…`);
+  onProgress?.(
+    genres.length
+      ? `Finding ${genreNames(genres)} you might like…`
+      : fromPlaylist
+        ? `Finding songs like ${settings.seeds.length} songs from ${settings.source!.name}…`
+        : `Gathering recommendations from ${settings.seeds.map(seedName).join(", ")}…`,
+  );
   const instruments = settings.instruments ?? [];
   const [{ candidates: base, seed, support }, extraInstr] = await Promise.all([
     genres.length ? fetchGenrePool(genres, settings.seeds, taste, depth) : fetchPool(settings.seeds, depth),
     instruments.length ? instrumentCandidates(instruments, settings.seeds, taste, "lite") : Promise.resolve([] as Candidate[]),
   ]);
-  const have = new Set(base.map((c) => c.key));
-  const all = [...base, ...extraInstr.filter((c) => !have.has(c.key) && (have.add(c.key), true))];
-  const candidates = all.filter((c) => !(settings.skipRated && ratedKeys.has(c.key)));
+  let pool = base;
+  if (fromPlaylist && base.length < n * 3) {
+    // Few song-level matches (titles Last.fm doesn't know, very new releases): add the playlist's main artists.
+    onProgress?.("Widening the search with the playlist's artists…");
+    const artists = [...new Set(settings.source!.tracks.map((t) => t.artist))].slice(0, 5).map((a) => ({ kind: "artist" as const, artist: a, title: a }));
+    const more = await fetchPool(artists, depth);
+    const seen = new Set(base.map((c) => c.key));
+    pool = [...base, ...more.candidates.filter((c) => !seen.has(c.key))];
+    for (const [k, v] of more.support) support.set(k, (support.get(k) ?? 0) + v);
+  }
+  const have = new Set(pool.map((c) => c.key));
+  const all = [...pool, ...extraInstr.filter((c) => !have.has(c.key) && (have.add(c.key), true))];
+  const original = inSource(settings.source);
+  const candidates = all.filter((c) => !(settings.skipRated && ratedKeys.has(c.key)) && !original(c));
   if (!candidates.length) throw new Error("Not enough recommendation data for these picks yet — try another seed or style.");
 
   onProgress?.(`Ranking ${candidates.length} songs for ${modeLabel(settings.mode)}…`);
@@ -306,7 +359,8 @@ export async function generatePlaylist(
   for (const { r } of withArt) {
     const n = support.get(r.c.key) ?? 1;
     const shapeNote = notes.get(r.c.key);
-    reasons[r.c.key] = (n > 1 ? (genres.length ? `Fits ${n} of your genres · ` : `Suggested by ${n} of your picks · `) : "") + explain(r) + (shapeNote ? ` · ${shapeNote}` : "");
+    const several = genres.length ? `Fits ${n} of your genres · ` : fromPlaylist ? `Similar to ${n} songs in ${settings.source!.name} · ` : `Suggested by ${n} of your picks · `;
+    reasons[r.c.key] = (n > 1 ? several : "") + explain(r) + (shapeNote ? ` · ${shapeNote}` : "");
     const ds = displayScore(r.c);
     if (ds && ds.label === "Last.fm similarity") scores[r.c.key] = ds.value;
   }
@@ -380,6 +434,7 @@ export function defaultName(settings: PlaylistSettings) {
   const label = modeLabel(settings.mode);
   if (settings.basis === "taste") return `${label} Mix`;
   if (settings.basis === "genre") return `${genreNames(genresOf(settings)) || "Genre"} for You`;
+  if (settings.basis === "playlist") return `${label}: like ${settings.source?.name ?? "a playlist"}`;
   return `${label}: ${basisLabel(settings)}`;
 }
 

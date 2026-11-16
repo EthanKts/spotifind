@@ -3,11 +3,11 @@
 // Controls shared by Playlists and Rapid-fire: what to build from (your taste, up to 5 picks, or a genre)
 // and the "shape" (energy bar + instruments).
 
-import { Heart, Search, Shapes, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Heart, Link2, Search, Shapes, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { Item, TagVector } from "@/lib/types";
 import type { SearchResponse } from "@/app/api/search/route";
-import type { PlaylistSettings } from "@/lib/taste/profile";
+import type { PlaylistSettings, PlaylistSource } from "@/lib/taste/profile";
 import { useJson } from "@/lib/client/data";
 import { seedName } from "@/lib/client/playlist";
 import { INSTRUMENTS } from "@/lib/recommend/tags";
@@ -93,7 +93,14 @@ export function BasisPicker({
   genres,
   setGenres,
   tasteTags,
+  source,
+  setSource,
+  initialLink,
 }: {
+  initialLink?: string;
+  /** Playlists only: build from a pasted Spotify playlist link (leave out to hide the option). */
+  source?: PlaylistSource | null;
+  setSource?: (s: PlaylistSource | null) => void;
   basis: Basis;
   setBasis: (b: Basis) => void;
   mySeeds: SeedT[];
@@ -113,12 +120,15 @@ export function BasisPicker({
     },
     { id: "seed", icon: Search, title: "Songs, albums or artists", hint: `Pick 1 to ${MAX_PICKS}. Songs several of them lead to rank higher.` },
     { id: "genre", icon: Shapes, title: "Genres, matched to my taste", hint: `Pick 1 to ${MAX_GENRES} precise genres, even ones you don’t usually listen to.` },
+    ...(setSource
+      ? [{ id: "playlist" as const, icon: Link2, title: "A Spotify playlist", hint: "Paste a playlist link. You get similar songs that aren’t in it." }]
+      : []),
   ];
 
   return (
     <div>
       <h2 className="label">Based on</h2>
-      <div className="mt-2 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Based on">
+      <div className={`mt-2 grid gap-2 ${options.length > 3 ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"}`} role="radiogroup" aria-label="Based on">
         {options.map(({ id, icon: Icon, title, hint, disabled }) => (
           <button
             key={id}
@@ -170,6 +180,105 @@ export function BasisPicker({
       )}
 
       {basis === "genre" && <GenrePicker genres={genres} setGenres={setGenres} tasteTags={tasteTags} />}
+
+      {basis === "playlist" && setSource && <PlaylistLink source={source ?? null} setSource={setSource} initial={initialLink} />}
+    </div>
+  );
+}
+
+async function fetchPlaylistSource(url: string): Promise<PlaylistSource> {
+  const res = await fetch(`/api/spotify/playlist?url=${encodeURIComponent(url.trim())}`);
+  const j = (await res.json()) as PlaylistSource | { error: string };
+  if ("error" in j) throw new Error(j.error);
+  return { id: j.id, name: j.name, image: j.image, total: j.total, tracks: j.tracks.map((t) => ({ artist: t.artist, title: t.title })) };
+}
+
+/** Paste a Spotify playlist link → its name, cover and songs (read by /api/spotify/playlist). */
+export function PlaylistLink({
+  source,
+  setSource,
+  initial,
+}: {
+  source: PlaylistSource | null;
+  setSource: (s: PlaylistSource | null) => void;
+  initial?: string;
+}) {
+  const [link, setLink] = useState("");
+  const [loading, setLoading] = useState(!!initial && !source);
+  const [error, setError] = useState<string | null>(null);
+
+  function load(url: string) {
+    if (!url.trim()) return;
+    setLoading(true);
+    setError(null);
+    return finish(fetchPlaylistSource(url));
+  }
+  function finish(p: Promise<PlaylistSource>) {
+    return p
+      .then((s) => {
+        setSource(s);
+        setLink("");
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }
+
+  // A link passed in the address (?from=) loads once.
+  useEffect(() => {
+    if (initial && !source) void finish(fetchPlaylistSource(initial));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="mt-3 rounded-md border border-line bg-base p-3">
+      {source && (
+        <div className="mb-3 flex items-center gap-3">
+          <Artwork src={source.image} alt={source.name} kind="album" className="size-12 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{source.name}</p>
+            <p className="truncate text-xs text-sub">
+              {source.total} songs
+              {source.tracks.length < source.total && ` · using the first ${source.tracks.length} (Spotify only shares the rest for your own playlists)`}
+            </p>
+          </div>
+          <button onClick={() => setSource(null)} aria-label={`Remove ${source.name}`} className="rounded p-1 text-mute hover:bg-hl hover:text-ink">
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+      <form
+        className="relative"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void load(link);
+        }}
+      >
+        <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sub" />
+        <input
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData("text");
+            if (text) {
+              e.preventDefault();
+              setLink(text);
+              void load(text);
+            }
+          }}
+          placeholder={source ? "Paste another playlist link to use it instead" : "Paste a Spotify playlist link, e.g. https://open.spotify.com/playlist/…"}
+          aria-label="Spotify playlist link"
+          className="input h-10 w-full pl-9"
+        />
+      </form>
+      {loading && (
+        <p className="mt-2 flex items-center gap-2 text-xs text-sub">
+          <Loader2 className="size-3.5 animate-spin" /> Reading the playlist…
+        </p>
+      )}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      {!source && !loading && !error && (
+        <p className="mt-2 text-xs text-mute">In Spotify: … → Share → Copy link to playlist. Public playlists, and your own.</p>
+      )}
     </div>
   );
 }

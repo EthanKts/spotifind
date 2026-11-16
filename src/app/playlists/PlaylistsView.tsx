@@ -7,9 +7,9 @@ import { Check, ListMusic, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Kind } from "@/lib/types";
 import { MODES, type Mode } from "@/lib/recommend/score";
-import { taste, useProfile, useTasteInput, type PlaylistSettings } from "@/lib/taste/profile";
+import { taste, useProfile, useTasteInput, type PlaylistSettings, type PlaylistSource } from "@/lib/taste/profile";
 import { useImported } from "@/lib/taste/imported";
-import { basisLabel, defaultName, generatePlaylist, LENGTH_CHOICES, modeLabel, newId, PLAYLIST_LENGTH, seedName, tasteSeeds } from "@/lib/client/playlist";
+import { basisLabel, defaultName, generatePlaylist, LENGTH_CHOICES, modeLabel, newId, PLAYLIST_LENGTH, playlistSeeds, seedName, tasteSeeds } from "@/lib/client/playlist";
 import { BasisPicker, ShapeControls, type Basis, type Picked } from "@/components/BuildControls";
 import { PlaylistCover } from "@/components/Sidebar";
 import { PageHeader } from "@/components/Cards";
@@ -49,7 +49,10 @@ export function PlaylistsView() {
   // Ratings load from storage just after the first render, so the default ("my taste" when you have
   // top-rated music) is derived, not frozen into state on that first render.
   const preGenre = sp.get("genre");
-  const [basisChoice, setBasis] = useState<Basis | null>(preGenre ? "genre" : prefill ? "seed" : null);
+  // ?from=<Spotify playlist link> opens "A Spotify playlist" with that link loaded.
+  const preLink = sp.get("from") ?? undefined;
+  const [basisChoice, setBasis] = useState<Basis | null>(preLink ? "playlist" : preGenre ? "genre" : prefill ? "seed" : null);
+  const [source, setSource] = useState<PlaylistSource | null>(null);
   const basis: Basis = basisChoice ?? (mySeeds.length ? "taste" : "seed");
   const [picked, setPicked] = useState<Picked[]>(prefill ? [{ s: prefill }] : []);
   // ?genre= takes subgenre ids or names, several separated by "|".
@@ -69,8 +72,11 @@ export function PlaylistsView() {
   const [error, setError] = useState<string | null>(null);
 
   // For a genre, your favourites are the bridge into it.
-  const seeds = basis === "seed" ? picked.map((x) => x.s) : mySeeds;
-  const ready = basis === "genre" ? genres.length > 0 : seeds.length > 0;
+  const seeds = useMemo(
+    () => (basis === "seed" ? picked.map((x) => x.s) : basis === "playlist" ? (source ? playlistSeeds(source) : []) : mySeeds),
+    [basis, picked, source, mySeeds],
+  );
+  const ready = basis === "genre" ? genres.length > 0 : basis === "playlist" ? !!source && seeds.length > 0 : seeds.length > 0;
   const pct = Math.round(adventure * 100);
 
   async function create() {
@@ -78,6 +84,7 @@ export function PlaylistsView() {
     const settings: PlaylistSettings = {
       basis, seeds, mode, adventure, perArtist: oneEach ? 1 : 2, skipRated, previewsOnly, length,
       genres: basis === "genre" ? genres : undefined,
+      source: basis === "playlist" && source ? source : undefined,
       energy, instruments,
     };
     try {
@@ -118,6 +125,9 @@ export function PlaylistsView() {
           genres={genres}
           setGenres={setGenres}
           tasteTags={tasteInput.tags}
+          source={source}
+          setSource={setSource}
+          initialLink={preLink}
         />
 
         {/* 2. Style */}
@@ -206,7 +216,12 @@ export function PlaylistsView() {
           {busy && <p className="text-sm text-sub">{busy}</p>}
           {!busy && ready && (
             <p className="text-sm text-sub">
-              {modeLabel(mode)} · from {basis === "genre" ? `${genreNames(genres)}, matched to your taste` : seeds.map(seedName).join(", ")}
+              {modeLabel(mode)} · from{" "}
+              {basis === "genre"
+                ? `${genreNames(genres)}, matched to your taste`
+                : basis === "playlist" && source
+                  ? `${source.name} (new songs only, built from ${seeds.length} of its songs)`
+                  : seeds.map(seedName).join(", ")}
               {energy != null && ` · energy ${Math.round(energy * 100)}`}
               {instruments.length > 0 && ` · ${instruments.length} instrument${instruments.length > 1 ? "s" : ""}`}
             </p>

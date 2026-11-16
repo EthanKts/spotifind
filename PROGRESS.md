@@ -150,3 +150,7 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] My ratings: Spotify-style chips, search, sort, list/compact/grid (Ratings + From Spotify)
 - [x] Docs, rebuild app + share package, test
 
+## Build from a Spotify playlist link (round 16)
+- [x] Read public playlists from a link (embed page, no quota; full list via API for your own)
+- [x] "A Spotify playlist" basis: similar songs not in it, all filters apply
+- [x] Docs, rebuild app, test
