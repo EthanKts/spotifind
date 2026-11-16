@@ -1,17 +1,16 @@
 "use client";
 
+import { genreNames, resolveGenre } from "@/lib/recommend/genres";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Heart, ListMusic, Loader2, Search, X } from "lucide-react";
+import { Check, ListMusic, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Item, Kind } from "@/lib/types";
-import type { SearchResponse } from "../api/search/route";
+import type { Kind } from "@/lib/types";
 import { MODES, type Mode } from "@/lib/recommend/score";
 import { taste, useProfile, useTasteInput, type PlaylistSettings } from "@/lib/taste/profile";
-import { useJson } from "@/lib/client/data";
 import { useImported } from "@/lib/taste/imported";
-import { defaultName, generatePlaylist, LENGTH_CHOICES, modeLabel, newId, PLAYLIST_LENGTH, seedName, tasteSeeds } from "@/lib/client/playlist";
-import { Artwork } from "@/components/Artwork";
+import { basisLabel, defaultName, generatePlaylist, LENGTH_CHOICES, modeLabel, newId, PLAYLIST_LENGTH, seedName, tasteSeeds } from "@/lib/client/playlist";
+import { BasisPicker, ShapeControls, type Basis, type Picked } from "@/components/BuildControls";
 import { PlaylistCover } from "@/components/Sidebar";
 import { PageHeader } from "@/components/Cards";
 
@@ -34,63 +33,6 @@ export function Toggle({ on, set, label, hint }: { on: boolean; set: (v: boolean
   );
 }
 
-export function SeedSearch({ onPick }: { onPick: (s: PlaylistSettings["seeds"][number], image?: string) => void }) {
-  const [q, setQ] = useState("");
-  const [submitted, setSubmitted] = useState("");
-  const { data, loading } = useJson<SearchResponse>(submitted ? `/api/search?q=${encodeURIComponent(submitted)}` : null);
-  const results: Item[] = data
-    ? [...(data.top ? [data.top] : []), ...data.tracks.slice(0, 4), ...data.artists.slice(0, 3), ...data.albums.slice(0, 3)].filter(
-        (it, i, arr) => arr.findIndex((x) => x.key === it.key) === i,
-      )
-    : [];
-  return (
-    <div>
-      <form
-        className="relative"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setSubmitted(q.trim());
-        }}
-      >
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-sub" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search a song, album or artist, then press Enter"
-          aria-label="Search for a playlist seed"
-          className="input h-10 w-full pl-9"
-        />
-      </form>
-      {loading && (
-        <p className="mt-2 flex items-center gap-2 text-xs text-sub">
-          <Loader2 className="size-3.5 animate-spin" /> Searching…
-        </p>
-      )}
-      {results.length > 0 && (
-        <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-          {results.map((it) => (
-            <li key={it.key}>
-              <button
-                onClick={() => onPick({ kind: it.kind, artist: it.artist, title: it.title }, it.image)}
-                className="flex w-full items-center gap-3 rounded-md p-1.5 text-left transition-colors hover:bg-hl"
-              >
-                <Artwork src={it.image} alt={it.title} kind={it.kind} className="size-10 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{it.title}</span>
-                  <span className="block truncate text-xs capitalize text-sub">
-                    {it.kind === "track" ? "Song" : it.kind}
-                    {it.kind !== "artist" && ` · ${it.artist}`}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 export function PlaylistsView() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -106,9 +48,14 @@ export function PlaylistsView() {
 
   // Ratings load from storage just after the first render, so the default ("my taste" when you have
   // top-rated music) is derived, not frozen into state on that first render.
-  const [basisChoice, setBasis] = useState<"taste" | "seed" | null>(prefill ? "seed" : null);
-  const basis = basisChoice ?? (mySeeds.length ? "taste" : "seed");
-  const [seed, setSeed] = useState<{ s: PlaylistSettings["seeds"][number]; image?: string } | null>(prefill ? { s: prefill } : null);
+  const preGenre = sp.get("genre");
+  const [basisChoice, setBasis] = useState<Basis | null>(preGenre ? "genre" : prefill ? "seed" : null);
+  const basis: Basis = basisChoice ?? (mySeeds.length ? "taste" : "seed");
+  const [picked, setPicked] = useState<Picked[]>(prefill ? [{ s: prefill }] : []);
+  // ?genre= takes subgenre ids or names, several separated by "|".
+  const [genres, setGenres] = useState<string[]>(() => (preGenre ? [...new Set(preGenre.split("|").filter(Boolean).map((g) => resolveGenre(g).id))].slice(0, 5) : []));
+  const [energy, setEnergy] = useState<number | null>(null);
+  const [instruments, setInstruments] = useState<string[]>([]);
   const [mode, setMode] = useState<Mode>((sp.get("mode") as Mode) || "closest");
   const [adventure, setAdventure] = useState(Number(sp.get("adventure") ?? 0.3));
   const [length, setLength] = useState(() => {
@@ -121,19 +68,25 @@ export function PlaylistsView() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const seeds = basis === "taste" ? mySeeds : seed ? [seed.s] : [];
+  // For a genre, your favourites are the bridge into it.
+  const seeds = basis === "seed" ? picked.map((x) => x.s) : mySeeds;
+  const ready = basis === "genre" ? genres.length > 0 : seeds.length > 0;
   const pct = Math.round(adventure * 100);
 
   async function create() {
     setError(null);
-    const settings: PlaylistSettings = { basis, seeds, mode, adventure, perArtist: oneEach ? 1 : 2, skipRated, previewsOnly, length };
+    const settings: PlaylistSettings = {
+      basis, seeds, mode, adventure, perArtist: oneEach ? 1 : 2, skipRated, previewsOnly, length,
+      genres: basis === "genre" ? genres : undefined,
+      energy, instruments,
+    };
     try {
       setBusy("Starting…");
       const res = await generatePlaylist(settings, tasteInput, new Set(Object.keys(p.ratings)), setBusy);
       if (res.tracks.length < Math.min(5, length)) throw new Error("Only found a few songs for this combination — try a different style or seed.");
-      if (res.tracks.length < length) {
-        setBusy(`Found ${res.tracks.length} of ${length} songs that fit — saving those.`);
-        await new Promise((r) => setTimeout(r, 1200));
+      if (res.tracks.length < length || res.note) {
+        setBusy(res.note ?? `Found ${res.tracks.length} of ${length} songs that fit — saving those.`);
+        await new Promise((r) => setTimeout(r, res.note ? 2500 : 1200));
       }
       const id = newId();
       taste.savePlaylist({
@@ -141,7 +94,7 @@ export function PlaylistsView() {
         name: defaultName(settings),
         createdAt: Date.now(),
         settings,
-        seedLabel: basis === "taste" ? "your taste" : seedName(seeds[0]),
+        seedLabel: basisLabel(settings),
         ...res,
       });
       router.push(`/playlist?id=${id}`);
@@ -156,53 +109,16 @@ export function PlaylistsView() {
       <PageHeader title="Playlists" description="Build a playlist from your recommendations in the style and length you choose." />
 
       <section className="panel mx-4 grid gap-6 p-5 md:mx-8" aria-label="Playlist settings">
-        {/* 1. Based on */}
-        <div>
-          <h2 className="label">Based on</h2>
-          <div className="mt-2 grid gap-3 md:grid-cols-2">
-            <button
-              onClick={() => setBasis("taste")}
-              disabled={!mySeeds.length}
-              data-on={basis === "taste"}
-                className="option p-3.5 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <Heart className="size-4 text-sub" /> From my taste
-              </span>
-              <span className="mt-1 block text-sm text-sub">
-                {mySeeds.length
-                  ? `Blends your favourites: ${mySeeds.map(seedName).join(", ")}`
-                  : "Rate a few songs or artists 4–5★ first, or import your taste from Spotify on My Ratings."}
-              </span>
-            </button>
-            <div data-on={basis === "seed"} className="option p-3.5 hover:bg-base">
-              <button onClick={() => setBasis("seed")} className="flex w-full items-center gap-2 text-left text-sm font-medium">
-                <Search className="size-4 text-sub" /> A song, album or artist
-              </button>
-              {basis === "seed" &&
-                (seed ? (
-                  <div className="mt-2 flex items-center gap-3 rounded-md border border-line bg-elev p-2">
-                    <Artwork src={seed.image} alt={seedName(seed.s)} kind={seed.s.kind} className="size-10 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{seedName(seed.s)}</span>
-                      <span className="block truncate text-xs capitalize text-sub">
-                        {seed.s.kind === "track" ? "Song" : seed.s.kind}
-                        {seed.s.kind !== "artist" && ` · ${seed.s.artist}`}
-                      </span>
-                    </span>
-                    <button onClick={() => setSeed(null)} aria-label="Change seed" className="rounded-full p-1.5 text-sub hover:bg-hl hover:text-ink">
-                      <X className="size-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-2">
-                    <SeedSearch onPick={(s, image) => setSeed({ s, image })} />
-                  </div>
-                ))}
-              {basis !== "seed" && <p className="mt-1 text-sm text-sub">Start from one thing you love.</p>}
-            </div>
-          </div>
-        </div>
+        <BasisPicker
+          basis={basis}
+          setBasis={setBasis}
+          mySeeds={mySeeds}
+          picked={picked}
+          setPicked={setPicked}
+          genres={genres}
+          setGenres={setGenres}
+          tasteTags={tasteInput.tags}
+        />
 
         {/* 2. Style */}
         <div>
@@ -223,6 +139,8 @@ export function PlaylistsView() {
             ))}
           </div>
         </div>
+
+        <ShapeControls energy={energy} setEnergy={setEnergy} instruments={instruments} setInstruments={setInstruments} />
 
         {/* 3. Length */}
         <div>
@@ -259,6 +177,7 @@ export function PlaylistsView() {
               value={pct}
               onChange={(e) => setAdventure(Number(e.target.value) / 100)}
               aria-label="Adventurousness"
+                title="Left: songs closest to what you picked. Right: further away, with artists you probably don’t know yet."
               className="sf-range always-thumb mt-2 w-full"
               style={{ ["--range-pct" as string]: `${pct}%`, ["--range-fill" as string]: "var(--color-find)" }}
             />
@@ -278,16 +197,18 @@ export function PlaylistsView() {
         <div className="flex flex-wrap items-center gap-4">
           <button
             onClick={create}
-            disabled={!seeds.length || !!busy}
+            disabled={!ready || !!busy}
             className="btn btn-primary btn-lg"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <ListMusic className="size-4" />}
             Create {length}-song playlist
           </button>
           {busy && <p className="text-sm text-sub">{busy}</p>}
-          {!busy && seeds.length > 0 && (
+          {!busy && ready && (
             <p className="text-sm text-sub">
-              {modeLabel(mode)} · from {seeds.map(seedName).join(", ")}
+              {modeLabel(mode)} · from {basis === "genre" ? `${genreNames(genres)}, matched to your taste` : seeds.map(seedName).join(", ")}
+              {energy != null && ` · energy ${Math.round(energy * 100)}`}
+              {instruments.length > 0 && ` · ${instruments.length} instrument${instruments.length > 1 ? "s" : ""}`}
             </p>
           )}
           {error && <p className="text-sm text-danger">{error}</p>}

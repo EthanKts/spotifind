@@ -134,12 +134,29 @@ function retryLater(b: Item) {
   }, 3000 * n);
 }
 
+// Small batches, several in flight: the first cards on screen (queued first) get their artwork back quickly
+// instead of waiting behind one big batch that includes off-screen items.
+const BATCH = 12;
+const MAX_IN_FLIGHT = 3;
+let inFlight = 0;
+
 function flush() {
   timer = null;
-  const batch = [...queued.values()].slice(0, 30);
-  batch.forEach((b) => queued.delete(b.key));
-  if (!batch.length) return;
-  fetch("/api/enrich", {
+  while (inFlight < MAX_IN_FLIGHT && queued.size) {
+    const batch = [...queued.values()].slice(0, BATCH);
+    batch.forEach((b) => queued.delete(b.key));
+    inFlight++;
+    sendBatch(batch).finally(() => {
+      inFlight--;
+      version++;
+      enrichListeners.forEach((l) => l());
+      if (queued.size && !timer) timer = setTimeout(flush, 10);
+    });
+  }
+}
+
+function sendBatch(batch: Item[]): Promise<void> {
+  return fetch("/api/enrich", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items: batch.map((b) => ({ kind: b.kind, artist: b.artist, title: b.title })) }),
@@ -161,11 +178,6 @@ function flush() {
         if (!enrich.has(b.key)) enrich.set(b.key, { incomplete: true });
         retryLater(b);
       }
-    })
-    .finally(() => {
-      version++;
-      enrichListeners.forEach((l) => l());
-      if (queued.size) timer = setTimeout(flush, 30);
     });
 }
 

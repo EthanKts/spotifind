@@ -47,6 +47,14 @@ export interface Candidate extends BaseItem {
   tags: TagVector;
   /** true when tags came from the artist rather than the track/album itself */
   tagsFromArtist?: boolean;
+  /** Discogs genres + styles (lower-case, 0..1), from the album or the artist's best-known albums. */
+  styles?: TagVector;
+  /** Measured audio features, when already known (never fetched just for ranking). */
+  audio?: AudioFeatures;
+  /** ListenBrainz similarity of this candidate's artist to the seed (0..1), when ListenBrainz also suggests it. */
+  lbMatch?: number;
+  /** For "explore genres": the chosen subgenre ids this song belongs to. */
+  genres?: string[];
 }
 
 export type CandidateSource =
@@ -56,11 +64,17 @@ export type CandidateSource =
   | "lastfm:similar-artist-top-album"
   | "lastfm:artist-deep-cut"
   | "lastfm:second-hop"
+  | "listenbrainz:similar-artist"
+  | "listenbrainz:similar-artist-top-track"
+  | "lastfm:genre-top-track"
+  | "lastfm:genre-bridge-artist"
   | "deezer:related-artist"
   | "deezer:related-artist-top-track";
 
 export interface Seed extends BaseItem {
   tags: TagVector;
+  styles?: TagVector;
+  audio?: AudioFeatures;
 }
 
 export interface RecommendResponse {
@@ -140,4 +154,15 @@ export interface SpotifyImport {
   items: ImportedItem[];
   /** Keys you removed one by one; a re-import keeps them out. */
   removed: string[];
+}
+
+/** Measured from the song's 30-second preview (ReccoBeats audio analysis). All 0..1 except tempo (BPM). */
+export interface AudioFeatures {
+  energy: number;
+  danceability: number;
+  valence: number;
+  tempo: number;
+  acousticness: number;
+  instrumentalness: number;
+  speechiness: number;
 }

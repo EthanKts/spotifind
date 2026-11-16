@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "eval": "jiti scripts/eval-recs.ts"
   },
   "dependencies": {
     "lucide-react": "^1.68.0",

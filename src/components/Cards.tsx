@@ -18,12 +18,15 @@ export function MediaCard({
   badge,
   queue,
   onOpen,
+  priority,
 }: {
   item: Item;
   subtitle?: ReactNode;
   badge?: ReactNode;
   queue?: Item[];
   onOpen?: () => void;
+  /** First row on the page: load the cover right away. */
+  priority?: boolean;
 }) {
   // Every card gets the verified cover (Spotify, then Deezer), whichever page it's on.
   const [item] = useEnriched(useMemo(() => [given], [given]));
@@ -40,7 +43,7 @@ export function MediaCard({
         className="absolute inset-0 z-0 rounded-lg"
       />
       <div className="pointer-events-none relative">
-        <Artwork src={item.image} alt={item.title} kind={item.kind} className="aspect-square w-full" />
+        <Artwork src={item.image} alt={item.title} kind={item.kind} priority={priority} className="aspect-square w-full" />
         {badge && <div className="absolute left-2 top-2">{badge}</div>}
         <div className="pointer-events-auto absolute bottom-2 right-2 z-10 translate-y-2 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
           {item.kind === "track" ? (
@@ -213,6 +216,21 @@ export function PageHeader({ title, description, actions, icon }: { title: React
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
+  );
+}
+
+/** The same error panel everywhere: what went wrong, and a Retry button. */
+export function ErrorState({ title, message, onRetry }: { title: string; message?: string; onRetry?: () => void }) {
+  return (
+    <div role="alert" className="mx-4 my-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 md:mx-8">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink">{title}</p>
+        {message && <p className="mt-0.5 text-xs text-sub">{message}</p>}
+      </div>
+      <button onClick={onRetry ?? (() => window.location.reload())} className="btn btn-secondary btn-sm">
+        Retry
+      </button>
+    </div>
   );
 }
 

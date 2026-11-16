@@ -34,6 +34,12 @@ const buckets: Record<string, Bucket> = {
   // Deezer: 50 requests per 5 seconds.
   "api.deezer.com": { rate: 9, burst: 20, maxConcurrent: 10, tokens: 20, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
   "api.spotify.com": { rate: 3, burst: 6, maxConcurrent: 3, tokens: 6, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
+  // Discogs: 60 requests/minute per token, shared by everyone using the same (built-in) token.
+  "api.discogs.com": { rate: 0.9, burst: 5, maxConcurrent: 2, tokens: 5, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
+  // ListenBrainz asks for at most one request per second.
+  "labs.api.listenbrainz.org": { rate: 1, burst: 1, maxConcurrent: 1, tokens: 1, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
+  // ReccoBeats (audio analysis of previews): a free service with unpublished limits, so stay gentle.
+  "api.reccobeats.com": { rate: 1.5, burst: 3, maxConcurrent: 2, tokens: 3, updated: Date.now(), active: 0, queue: [], waitingNormal: 0 },
 };
 
 function refill(b: Bucket) {
@@ -103,6 +109,11 @@ function db(): DatabaseSync | null {
   return g.__sfDb;
 }
 
+/** Look up a cached value without fetching (e.g. to skip expensive preparation on a hit). */
+export function peekCache<T = unknown>(key: string): T | undefined {
+  return readCache(key) as T | undefined;
+}
+
 function readCache(key: string): unknown | undefined {
   const hit = memory.get(key);
   if (hit && hit.exp > Date.now()) return hit.value;
@@ -138,7 +149,7 @@ export class HttpError extends Error {
 
 export async function fetchJson<T = unknown>(
   url: string,
-  opts: { ttlSec?: number; headers?: Record<string, string>; cacheKey?: string; method?: string; body?: string } = {},
+  opts: { ttlSec?: number; headers?: Record<string, string>; cacheKey?: string; method?: string; body?: string | FormData } = {},
 ): Promise<T> {
   const ttl = opts.ttlSec ?? 6 * 3600;
   const key = opts.cacheKey ?? url;
@@ -157,14 +168,14 @@ export async function fetchJson<T = unknown>(
       let res: Response | undefined;
       // Last.fm/Deezer occasionally stall a single request for 5–10 s while a retry answers in ~0.3 s,
       // so the first attempt gets a short deadline. MusicBrainz is strictly 1 req/s, so it keeps a long one.
-      const firstTimeout = host === "musicbrainz.org" ? 12_000 : 4_000;
+      const firstTimeout = host === "musicbrainz.org" || host === "api.reccobeats.com" ? 15_000 : 4_000;
       // Rate limits (429) and overloads (502/503) are usually momentary: back off and retry twice.
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           res = await fetch(url, {
             method: opts.method ?? "GET",
             body: opts.body,
-            headers: { "User-Agent": "Spotifind/0.1", Accept: "application/json", ...opts.headers },
+            headers: { "User-Agent": "Spotifind/1.0 (+https://github.com/EthanKts/spotifind)", Accept: "application/json", ...opts.headers },
             cache: "no-store",
             signal: AbortSignal.timeout(attempt === 0 ? firstTimeout : 12_000),
           });

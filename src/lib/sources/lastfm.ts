@@ -258,6 +258,19 @@ export async function tagTopArtists(tag: string, limit = 12): Promise<LfArtist[]
   return arr(d.topartists?.artist as never[]).map((a: Record<string, never>) => ({ name: a.name, mbid: a.mbid || undefined }));
 }
 
+/** A tag's most-played songs on Last.fm (no play counts in this call; rank is the chart position). */
+export async function tagTopTracks(tag: string, limit = 100): Promise<LfTrack[]> {
+  type R = { tracks?: { track?: unknown } };
+  const d = await call<R>("tag.getTopTracks", { tag, limit });
+  return arr(d.tracks?.track as never[]).map((t: Record<string, never>) => ({
+    name: t.name,
+    artist: (t.artist as { name: string })?.name,
+    durationSec: Number(t.duration) || undefined,
+    rank: Number((t["@attr"] as { rank?: string })?.rank) || undefined,
+    mbid: t.mbid || undefined,
+  }));
+}
+
 export async function tagTopAlbums(tag: string, limit = 12): Promise<LfAlbum[]> {
   type R = { albums?: { album?: unknown } };
   const d = await call<R>("tag.getTopAlbums", { tag, limit });

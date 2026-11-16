@@ -335,6 +335,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     @objc private func goBack() { webView.goBack() }
     @objc private func goForward() { webView.goForward() }
     @objc private func goHome() { if appLoaded { webView.load(URLRequest(url: URL(string: ServerController.origin + "/")!)) } }
+    @objc private func openSettingsPage() {
+        if appLoaded { webView.load(URLRequest(url: URL(string: ServerController.origin + "/settings")!)) }
+    }
+
     @objc private func openSetupGuide() {
         if appLoaded { webView.load(URLRequest(url: URL(string: ServerController.origin + "/?setup=1")!)) }
     }
@@ -373,9 +377,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About Spotifind", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        let settings = NSMenuItem(title: "API Keys…", action: #selector(openSettingsFile), keyEquivalent: ",")
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettingsPage), keyEquivalent: ",")
         settings.target = self
         appMenu.addItem(settings)
+        let settingsFile = NSMenuItem(title: "Open Settings File…", action: #selector(openSettingsFile), keyEquivalent: "")
+        settingsFile.target = self
+        appMenu.addItem(settingsFile)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Hide Spotifind", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
@@ -415,6 +422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         add("History", #selector(goTo(_:)), "5", path: "/recent")
         add("My Ratings", #selector(goTo(_:)), "6", path: "/ratings")
         add("Rapid-fire", #selector(goTo(_:)), "7", path: "/rapid")
+        add("Genres", #selector(goTo(_:)), "", path: "/genres")
         go.addItem(.separator())
         add("Back", #selector(goBack), "[")
         add("Forward", #selector(goForward), "]")

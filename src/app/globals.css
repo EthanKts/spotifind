@@ -155,3 +155,13 @@ input[type="range"].sf-range.always-thumb::-webkit-slider-thumb {
     @apply h-9 rounded-md border border-line bg-base px-3 text-sm text-ink placeholder:text-mute focus:border-sub focus:outline-none;
   }
 }
+
+/* Respect "Reduce motion" in macOS accessibility settings. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

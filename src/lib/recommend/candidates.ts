@@ -1,7 +1,11 @@
 import "server-only";
 import * as lf from "../sources/lastfm";
 import * as dz from "../sources/deezer";
-import { inBackground, mapLimit } from "../sources/http";
+import { inBackground, mapLimit, peekCache, within } from "../sources/http";
+import * as dg from "../sources/discogs";
+import * as lb from "../sources/listenbrainz";
+import { audioFeatures } from "../sources/reccobeats";
+import type { AudioFeatures } from "../types";
 import type { Candidate, Kind, RecommendResponse, Seed, TagVector } from "../types";
 import { itemKey, norm } from "../util";
 
@@ -124,7 +128,10 @@ async function fromTrack(seed: Seed, pool: Pool, depth: Depth, sources: Set<stri
     add(pool, trackCand(t, seed.artist, { source: "lastfm:similar-track", hop: 1, match: t.match, via: seed.title }));
   }
 
-  const topSim = depth === "quick" ? [] : simArtists.slice(0, depth === "full" ? 8 : 5);
+  // Few or no similar songs on Last.fm (common for newer or less-scrobbled songs): draw from more similar
+  // artists instead, so the pool isn't a handful of artists repeated.
+  const sparse = similar.length < 30;
+  const topSim = depth === "quick" ? [] : simArtists.slice(0, depth === "full" ? (sparse ? 15 : 8) : sparse ? 15 : 5);
   const tops = await mapLimit(topSim, 8, (a) => lf.artistTopTracks(a.name, depth === "full" ? 40 : 5));
   topSim.forEach((a, i) => {
     for (const t of tops[i] ?? []) {
@@ -305,6 +312,77 @@ async function fromDeezer(seed: Seed, pool: Pool, sources: Set<string>) {
   });
 }
 
+// ---------------------------------------------------------------- extra signals (full pass only)
+
+/**
+ * ListenBrainz agreement, Discogs styles and measured audio. Everything here is optional and time-boxed:
+ * whatever isn't ready in time is skipped now and keeps filling the disk cache for next time.
+ */
+/** Sources the evaluation script can switch off to measure what each one adds. */
+export type Extra = "listenbrainz" | "discogs" | "audio";
+
+async function attachExtras(seed: Seed, pool: Pool, sources: Set<string>, exclude: Extra[] = [], wait = 3000) {
+  const strength = (c: Candidate) => (c.match ?? (c.artistMatch ?? 0) * 0.6) / c.hop;
+  const ranked = [...pool.values()].sort((a, b) => strength(b) - strength(a));
+
+  // 1. ListenBrainz: a second, independent "people who play X also play Y" signal.
+  const lbPart = (async () => {
+    if (exclude.includes("listenbrainz")) return;
+    const mbid = seed.mbid ?? (await lf.artistInfo(seed.artist).then((i) => i.mbid).catch(() => undefined));
+    if (!mbid) return;
+    const sim = await lb.similarArtists(mbid, 60);
+    if (!sim.length) return;
+    sources.add("ListenBrainz");
+    const byName = new Map(sim.map((x) => [norm(x.name), x.match]));
+    const inPool = new Set<string>();
+    for (const c of pool.values()) {
+      const m = byName.get(norm(c.artist));
+      if (m != null) {
+        c.lbMatch = m;
+        inPool.add(norm(c.artist));
+      }
+    }
+  })().catch(() => {});
+
+  // 2. Discogs styles: the seed's, and the strongest artists'.
+  const dgPart = (async () => {
+    if (!dg.hasDiscogs() || exclude.includes("discogs")) return;
+    const seedStyles = seed.kind === "album" ? await dg.albumInfo(seed.artist, seed.title).then((i) => i && Object.fromEntries([...i.styles, ...i.genres].map((s, n) => [s.toLowerCase(), n < i.styles.length ? 1 : 0.5]))) : null;
+    seed.styles = seedStyles && Object.keys(seedStyles).length ? seedStyles : await dg.artistStyles(seed.artist);
+    const artists = [...new Set(ranked.map((c) => c.artist))].slice(0, 15);
+    const got = await mapLimit(artists, 2, (a) => dg.artistStyles(a));
+    const byArtist = new Map(artists.map((a, i) => [norm(a), got[i]]));
+    for (const c of pool.values()) {
+      const st = byArtist.get(norm(c.artist)) ?? dg.peekArtistStyles(c.artist);
+      if (st && Object.keys(st).length) c.styles = st;
+    }
+    sources.add("Discogs styles");
+  })().catch(() => {});
+
+  // 3. Measured audio: the seed's (measured now), candidates' only if already measured (never just for ranking).
+  const audioPart = (async () => {
+    if (exclude.includes("audio")) return;
+    if (seed.kind === "track") {
+      const t = await dz.findTrack(seed.artist, seed.title).catch(() => undefined);
+      if (t?.id) seed.audio = (await audioFeatures(t.id)) ?? undefined;
+    }
+    const tracks = ranked.filter((c) => c.kind === "track").slice(0, 30);
+    const found = await mapLimit(tracks, 6, (c) => dz.findTrack(c.artist, c.title).catch(() => undefined));
+    const unmeasured: number[] = [];
+    tracks.forEach((c, i) => {
+      const id = found[i]?.id;
+      if (!id) return;
+      const f = peekCache<AudioFeatures>(`rb:features:${id}`);
+      if (f && typeof f.energy === "number") c.audio = f;
+      else unmeasured.push(id);
+    });
+    // Warm the next request: measure a few of the strongest in the background (rate-limited, cached for a year).
+    void inBackground(() => mapLimit(unmeasured.slice(0, 10), 1, (id) => audioFeatures(id))).catch(() => {});
+  })().catch(() => {});
+
+  await within(Promise.all([lbPart, dgPart, audioPart]).then(() => undefined), wait, undefined);
+}
+
 // ---------------------------------------------------------------- entry point
 
 export async function buildRecommendations(
@@ -312,15 +390,15 @@ export async function buildRecommendations(
   artist: string,
   title: string,
   depth: Depth,
-  opts: { foreground?: boolean } = {},
+  opts: { foreground?: boolean; exclude?: Extra[]; wait?: number } = {},
 ): Promise<RecommendResponse> {
   // The full pass usually refines results already on screen: run it in the background lane so it never
   // delays clicks — unless someone is actively waiting for it (e.g. building a long playlist).
-  if (depth === "full" && !opts.foreground) return inBackground(() => build(kind, artist, title, depth));
-  return build(kind, artist, title, depth);
+  if (depth === "full" && !opts.foreground) return inBackground(() => build(kind, artist, title, depth, opts.exclude, opts.wait));
+  return build(kind, artist, title, depth, opts.exclude, opts.wait);
 }
 
-async function build(kind: Kind, artist: string, title: string, depth: Depth): Promise<RecommendResponse> {
+async function build(kind: Kind, artist: string, title: string, depth: Depth, exclude: Extra[] = [], wait?: number): Promise<RecommendResponse> {
   const sources = new Set<string>();
   const limitations: string[] = [];
   const pool: Pool = new Map();
@@ -337,6 +415,12 @@ async function build(kind: Kind, artist: string, title: string, depth: Depth): P
     if (depth !== "quick") {
       // Artist popularity (for Hidden Gems among artists) costs a request per artist — full depth only.
       await Promise.all([attachTags(pool, depth), depth === "full" ? attachArtistPopularity(pool, depth) : Promise.resolve()]);
+      // Extra data (ListenBrainz agreement, Discogs styles, audio) is gathered in the background: it no longer
+      // affects ranking (see weights.ts), so nobody waits for it. The evaluation script can still wait (`wait=`).
+      if (depth === "full") {
+        const extras = attachExtras(seed, pool, sources, exclude, wait);
+        if (wait) await extras;
+      }
       sources.add("Last.fm tags");
     }
     if (!pool.size) limitations.push("Last.fm has no similarity data for this item yet — try the artist or a better-known track.");

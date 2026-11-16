@@ -12,7 +12,7 @@ Spotifind is installed at **~/Applications/Spotifind.app**. Open it like any oth
 - **Open in Spotify** opens the Spotify desktop app directly.
 - API keys live in `~/Library/Application Support/Spotifind/config.env`. To edit them, use **Spotifind › API Keys…** (⌘,), then quit and reopen.
 - Server log: `~/Library/Logs/Spotifind/server.log`.
-- Shortcuts: ⌘1 Home, ⌘2 Search, ⌘3 Discover, ⌘4 Playlists, ⌘5 History, ⌘6 My Ratings, ⌘7 Rapid-fire; ⌘[ / ⌘] back and forward; ⌘R reload; ⌘K search.
+- Shortcuts: ⌘1 Home, ⌘2 Search, ⌘3 Discover, ⌘4 Playlists, ⌘5 History, ⌘6 My Ratings, ⌘7 Rapid-fire, ⌘, Settings; **⌘K command palette** (jump anywhere, start a mode, search); **/** focus search; **?** all shortcuts; ⌘[ / ⌘] back and forward; ⌘R reload.
 
 To rebuild and reinstall after changing the code:
 
@@ -67,6 +67,7 @@ npm run dev        # http://localhost:3000 (use "localhost", not 127.0.0.1: Next
 | Key | Needed? | What it adds |
 |---|---|---|
 | `LASTFM_API_KEY` | Recommended | Similarity scores, tags, Groove/Mood modes, play counts. Free at https://www.last.fm/api/account/create |
+| `DISCOGS_TOKEN` | Optional | Precise genres and fine-grained styles per album (better matching and explanations). Free at https://www.discogs.com/settings/developers → Generate token. Set it in **Settings** (⌘,). |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Optional | Exact "Open in Spotify" links (otherwise a Spotify search link opens). Free app at https://developer.spotify.com/dashboard |
 
 MusicBrainz, Cover Art Archive and Deezer need no keys. Restart the server after editing `.env.local`.
@@ -76,6 +77,7 @@ MusicBrainz, Cover Art Archive and Deezer need no keys. Restart the server after
 - **Last.fm**: `track.getSimilar` and `artist.getSimilar` provide the % similarity shown on cards. They're based on what real listeners play together. Top tags describe genre, instrumentation, mood and vocals. Play counts identify deep cuts and hidden gems.
 - **Deezer**: artwork, search, and the **real 30-second previews** played in the bottom player. With no Last.fm key, Deezer's related-artist graph is the fallback.
 - **MusicBrainz**: original release years and studio discographies.
+- **ReccoBeats**: measures energy, danceability, mood and tempo from 30-second previews (free, no key).
 - **Spotify**: checks that every recommended song and album really exists on Spotify, and supplies its cover art (see *Accurate artwork and availability* below). Its audio-features and recommendations endpoints are closed to new apps, so no Spotify data affects ranking.
 
 ### Accurate artwork and availability
@@ -103,8 +105,15 @@ Recommendations (Discover, Home, Playlists, Rapid-fire, genre pages) leave out a
 
 **Playlists** (⌘4) builds a playlist of 10–50 songs (15 by default) from Spotifind's most relevant recommendations:
 
-1. **Based on:** *From my taste* (blends your 3 top-rated songs/artists — songs suggested by several of them rank higher) or one song, album or artist. Discover's "Make a 15-song playlist from this" button pre-fills it with the current style.
+1. **Based on:**
+   - *From my taste*: blends your 3 top-rated songs/artists. Songs suggested by several of them rank higher.
+   - *Songs, albums or artists*: combine **up to 5** picks for a more precise result. Songs that several picks lead to rank higher.
+   - *Genres, matched to my taste*: pick **up to 5** precise genres (see below).
+
+   Discover's button pre-fills it with the current style.
 2. **Style:** Closest Match, Deep Cuts, Hidden Gems, Same Groove, Same Mood or Explore Further, plus the Very Similar ↔ More Adventurous slider.
+   Variety: one song per artist by default, never two songs from the same album, and no more than two songs in a row with the same main genre tag.
+3. **Energy** (Calm ↔ Energetic, off by default) and **Instruments** (guitar, piano/keys, saxophone, brass, strings, synths, bass, drums, organ, instrumental, acoustic). Both work in Rapid-fire too.
 3. **Options:** one song per artist (tops up with second songs if there aren't 15 artists), skip songs you've already rated, previewable songs only.
 
 **Save to Spotify** creates the playlist in your Spotify account (later, **Update on Spotify** syncs swaps and regenerations into the same Spotify playlist). One-time setup, guided inside the app:
@@ -116,6 +125,16 @@ Recommendations (Discover, Home, Playlists, Rapid-fire, genre pages) leave out a
 Spotify requires the developer app's owner to have **Premium** (Spotify's February 2026 rules). The login is stored only on this Mac (`~/Library/Application Support/Spotifind/spotify-auth.json`, readable only by you); Disconnect removes it. Songs are matched on Spotify by artist + title; any that Spotify doesn't have are listed after saving. Once connected, "Open in Spotify" buttons also jump to the exact song instead of a search.
 
 Each song shows why it's there and its real Last.fm similarity. **Swap** replaces a song with the next-best one; **Regenerate** rebuilds with the same settings; **Copy song list** copies "Artist – Title" lines. Stars you give inside a playlist count toward that style's score on the ratings page. 
+
+## Energy, instruments and genres
+
+- **Energy is measured from the audio.** Spotify's audio-features API is closed to new apps, so Spotifind sends each song's public 30-second Deezer preview to **ReccoBeats**, a free audio-analysis service (no key, no account, nothing personal). It gets back energy, danceability, mood (valence), tempo, acousticness and instrumentalness. Results are cached for a year in the disk cache, so each song is measured once. The first playlist using the energy bar takes ~20–30 s longer; later ones are instant. Songs within a tolerance of your chosen energy come first, and the tolerance widens only if too few fit. Songs that couldn't be measured fall back to an estimate from listener tags ("chill", "energetic", "party"…), marked "(estimated)". See `src/lib/sources/reccobeats.ts`, `/api/features` and `src/lib/recommend/shape.ts`.
+- **Instruments** use listener tags. Songs similar to your picks are rarely tagged with an instrument, so choosing one also pulls in songs from that instrument's own tag ("saxophone"), favouring artists similar to your picks. "Instrumental" and "Acoustic" use the measured audio.
+- **Explore genres, matched to my taste** (`src/lib/recommend/genre.ts`, `/api/recommend/genre?genres=jazz-hard-bop|jazz-soul-jazz`). Genres are precise subgenres from `src/lib/recommend/genres.ts`: 19 families and about 190 subgenres (Jazz alone: Bebop, Hard Bop, Cool, Modal, Post-Bop, Free, Spiritual, Soul-Jazz, Jazz-Funk, Jazz-Rock & Fusion, Latin, Vocal, Big Band & Swing, Smooth, Contemporary, Nu/Acid, Ethio-Jazz, Dixieland). Each is defined by its **Discogs styles** (filed per album by Discogs editors) and its Last.fm tags.
+  - Songs come from the best-known albums Discogs files under that style (the style must be the album's main one), Last.fm's chart for the tag, and **bridge artists**: artists similar to your favourites that belong to the genre.
+  - **Every artist must pass a membership check**: on Discogs' albums for the style, or the genre is one of the artist's own strongest Last.fm tags (≥ 0.4). A loosely applied tag isn't enough. For an artist who spans genres, songs come from their albums in that style (Miles Davis in Jazz-Funk means *On the Corner*, not *So What*).
+  - With several genres, the playlist takes turns between them, and songs that fit more than one rank a little higher.
+  - Then everything is ranked against the rest of your taste, with the genres' own tags left out. The genre picker has a family row, a search box, and a "You listen to this" hint. Anything typed that isn't in the list is used as a plain Last.fm tag.
 
 ## Rapid-fire
 
@@ -136,12 +155,30 @@ To avoid starting from nothing, choose **Import my taste from Spotify**. It's of
 
 - Imported items are **not** star ratings. They feed the taste profile (`deriveTaste` in `src/lib/taste/profile.ts`) at about a 4★ strength at most. Recent listening counts most: the last 4 weeks ×1.0, the last 6 months ×0.8, all-time ×0.6. Position in the top-50 scales each one from 1.0 down to 0.5. Imported items never hide anything.
 - A real rating of the same song or artist always replaces the imported signal.
-- My Ratings has an **Imported from Spotify** section. You can remove single items (a re-import keeps them out) or **Remove all imported**.
+- **My ratings → Ratings** works like Spotify's library: **Songs / Artists / Albums** chips, **search**, **sort** (Recently rated, Rating high→low or low→high, Title A–Z, Artist A–Z, Grouped by stars) and **List / Compact / Grid** views. Your choices are remembered.
+- **My ratings → From Spotify** shows **Top artists** (photo grid) and **Top songs** (playable rows), each numbered by how much you play them and filterable by **Last 4 weeks / Last 6 months / All-time**, with search, sort (Most played, A–Z, Artist A–Z) and grid/list views. You can rate any of them yourself, remove single items (a re-import keeps them out), or **Remove all**.
 - This needs the `user-top-read` permission. Logins made before this feature don't have it, so Spotifind asks you to **Reconnect Spotify** once.
 - If Spotify refuses (for example, the developer app's owner has no Premium, or your account isn't on the app's user list under Spotify's February 2026 rules), the error is shown in place and nothing else breaks.
 - Stored only in `~/Library/Application Support/Spotifind/spotify-import.json` (readable only by you). The browser only keeps a copy in memory.
 
+## Smooth flow and Genres
+
+- **Smooth flow** (on a playlist page): reorders the songs like a DJ set, starting calm. Each song is close in tempo (half/double time counts) and energy to the one before.
+- **Genres** page: every family and subgenre (e.g. Jazz → Bebop, Hard Bop, Soul-Jazz, Jazz-Funk…), each one click away from Rapid-fire or a playlist matched to your taste.
+
+## More precise recommendations
+
+- Sources: Last.fm (similarity, tags), **ListenBrainz** (second "listeners also play" signal; no key; tracks suggested by both get a boost), **Discogs** (genres + styles; optional token; 60 req/min shared, cached 30 days), **ReccoBeats** (measured energy, valence, tempo, acousticness, instrumentalness from previews; no key), MusicBrainz (original years), Deezer (artwork, previews), Spotify (availability, your login).
+- Every ranking weight is in `src/lib/recommend/weights.ts`. The extra components (style similarity, audio similarity, the ListenBrainz agreement boost, taste learned from styles and sound) are **switched off (0)**: playlists fitted better and were more varied without them, and the eval showed no gain. ListenBrainz no longer adds artists to the pool. The data is still collected for explanations, genres and the energy filter.
+- Explanations use the new data, e.g. "styles: Trip Hop, Downtempo · dark (valence 0.18), 128 BPM · ListenBrainz listeners agree".
+- **`npm run eval`** (dev server running) hides 20% of your favourites and reports how many land in the top 50, per source. It reads your ratings read-only from the app's storage and makes no Spotify calls.
+- **Settings → Data coverage** shows the share of your rated songs with measured audio and of rated artists with Discogs styles, and which sources are on.
+
 ## Speed
+
+- **Right-sized artwork**: covers are requested at about 2× their display size from Deezer, Spotify, Last.fm and Cover Art Archive; anything else goes through `/api/img`, which resizes once with sharp and caches WebP files in `~/Library/Application Support/Spotifind/img` (year-long immutable caching + ETag). A Discover page went from ~4 MB to ~0.4 MB of images, and from 18.9 s to 1.1 s until all visible covers show.
+- Covers fade in over a colour placeholder, load lazily below the fold and at high priority in the first row, and Rapid-fire preloads the next 3.
+- Artwork lookups run in small parallel batches, so on-screen cards come first.
 
 - **Disk cache** (`~/Library/Caches/Spotifind/api-cache.sqlite`): everything fetched once is instant afterwards, across relaunches.
 - **Two-pass recommendations:** a quick similarity-only pass shows results in ~0.3–1 s; the detailed pass (tags, deep cuts, second hop) replaces it a few seconds later.
@@ -184,5 +221,3 @@ src/lib/taste/      profile store (ratings) + imported Spotify taste
 src/lib/client/     data hooks (enrichment, years, JSON cache), player store
 ```
 
-## Credits
-BPM and key data provided by [GetSongBPM](https://getsongbpm.com)

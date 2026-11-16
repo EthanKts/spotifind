@@ -20,6 +20,7 @@ import type { ImportedItem, Item, TagVector } from "../types";
 import { norm } from "../util";
 import type { TasteInput } from "../recommend/score";
 import { useImported } from "./imported";
+import { useTasteExtras } from "./extras";
 
 export interface Entry { item: Item; at: number; via?: string }
 
@@ -37,8 +38,18 @@ export interface Rating extends Entry {
 }
 
 export interface PlaylistSettings {
-  basis: "taste" | "seed";
+  /** taste = your favourites · seed = 1–5 songs/albums/artists you picked · genre = a genre matched to your taste */
+  basis: "taste" | "seed" | "genre";
+  /** For "genre", your favourites (used to find bridge artists into the genre). */
   seeds: { kind: Item["kind"]; artist: string; title: string }[];
+  /** Up to 5 subgenre ids (recommend/genres.ts) for basis "genre". */
+  genres?: string[];
+  /** Older saved playlists: one free-text genre (Last.fm tag). Read through genresOf(). */
+  genre?: string;
+  /** 0 = calm … 1 = energetic; null/undefined = any energy. */
+  energy?: number | null;
+  /** Instrument filter (INSTRUMENTS ids in recommend/tags.ts). */
+  instruments?: string[];
   mode: string;
   adventure: number;
   perArtist: number;
@@ -66,8 +77,17 @@ export interface Playlist {
   spotify?: { id: string; url: string; uri: string; exportedAt: number; found: number; missing: string[] };
 }
 
+/** Left over from the removed Trail feature; kept so older saved data still loads. */
+export interface SavedTrail {
+  id: string;
+  name: string;
+  at: number;
+  path: { kind: "artist" | "track"; artist: string; title: string }[];
+}
+
 export interface Profile {
   v: 2;
+  trails?: SavedTrail[];
   ratings: Record<string, Rating>;
   playlists: Playlist[];
   /** Interests you removed on the My Ratings page; excluded from the derived profile. */
@@ -248,7 +268,13 @@ export function useDerivedTaste(): DerivedTaste {
 
 export function useTasteInput(): TasteInput {
   const d = useDerivedTaste();
-  return useMemo(() => ({ tags: d.tags, artists: d.artists, loved: d.loved, hidden: d.hidden }), [d]);
+  const p = useProfile();
+  const imp = useImported();
+  const extras = useTasteExtras(p, imp.items);
+  return useMemo(
+    () => ({ tags: d.tags, artists: d.artists, loved: d.loved, hidden: d.hidden, styles: extras.styles, audio: extras.audio, audioConfidence: extras.audioConfidence }),
+    [d, extras],
+  );
 }
 
 /** True once at least one thing is rated 4★ or more (or a Spotify taste import exists). */

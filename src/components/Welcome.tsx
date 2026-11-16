@@ -37,7 +37,7 @@ const readDone = () => read(DONE_KEY) === "1";
 const readForced = () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("setup") === "1";
 const readSavedStep = () => read(STEP_KEY);
 
-type StepId = "welcome" | "access" | "lastfm" | "spotify" | "taste" | "tour";
+type StepId = "welcome" | "how" | "access" | "lastfm" | "spotify" | "taste" | "tour";
 
 export function Welcome() {
   const keys = useKeyStatus();
@@ -62,6 +62,7 @@ export function Welcome() {
     if (!keys || !sp) return [];
     return [
       "welcome",
+      "how",
       ...(sp.shared && !sp.connected ? (["access"] as const) : []),
       ...(!keys.lastfm ? (["lastfm"] as const) : []),
       "spotify",
@@ -107,6 +108,7 @@ export function Welcome() {
 
         <div className="mt-8">
           {step === "welcome" && <WelcomeStep onNext={next} />}
+          {step === "how" && <HowStep onNext={next} />}
           {step === "access" && <AccessStep who={who} onNext={next} />}
           {step === "lastfm" && <LastfmStep onNext={next} />}
           {step === "spotify" && <SpotifyStep sp={sp} setSp={setSp} who={who} onNext={next} />}
@@ -163,6 +165,50 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       </ul>
       <button onClick={onNext} className="btn btn-primary btn-lg mt-6">
         Get started <ArrowRight className="size-4" />
+      </button>
+    </>
+  );
+}
+
+const STARS: [string, string][] = [
+  ["5★ / 4★", "More music like this, and more from this artist"],
+  ["3★", "Neutral"],
+  ["2★", "Less like this"],
+  ["1★", "Never recommend it again"],
+];
+const MODE_HELP: [string, string][] = [
+  ["Closest Match", "The most similar songs"],
+  ["Deep Cuts", "Lesser-known songs, not the hits"],
+  ["Hidden Gems", "Close matches very few people know"],
+  ["Same Groove", "Same rhythm, genre and instruments"],
+  ["Same Mood", "Same feeling and energy"],
+  ["Explore Further", "Two steps away, new artists only"],
+];
+
+function HowStep({ onNext }: { onNext: () => void }) {
+  return (
+    <>
+      <StepTitle title="How Spotifind learns">Your stars are how it learns. The more you rate, the better it gets.</StepTitle>
+      <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        {STARS.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="font-medium text-find">{k}</dt>
+            <dd className="text-sub">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="label mt-6">Ways to discover</p>
+      <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        {MODE_HELP.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="font-medium text-ink">{k}</dt>
+            <dd className="text-sub">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-mute">The “Very similar ↔ More adventurous” bar decides how far from what you know Spotifind goes.</p>
+      <button onClick={onNext} className="btn btn-primary btn-lg mt-6">
+        Got it <ArrowRight className="size-4" />
       </button>
     </>
   );

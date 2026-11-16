@@ -8,7 +8,7 @@ import { artistUrl, useEnriched, useJson } from "@/lib/client/data";
 import { useDerivedTaste, useProfile } from "@/lib/taste/profile";
 import { cosine, formatCount } from "@/lib/util";
 import { SeedHeader } from "@/components/SeedHeader";
-import { Grid, MediaCard, SectionTitle, Shelf, ShelfItem, TrackRow } from "@/components/Cards";
+import { Grid, MediaCard, SectionTitle, Shelf, ShelfItem, TrackRow, ErrorState } from "@/components/Cards";
 import { discoverHref } from "@/components/Actions";
 import { TagChips } from "@/components/TagChips";
 
@@ -67,7 +67,7 @@ export function ArtistView({ name }: { name: string }) {
         }
       />
       {loading && <p className="px-4 text-sub md:px-8">Loading discography and listening data…</p>}
-      {error && <p className="px-4 text-danger md:px-8">Couldn&apos;t load this artist: {error}</p>}
+      {error && <ErrorState title="Couldn’t load this artist" message={error} />}
 
       {data && (
         <>

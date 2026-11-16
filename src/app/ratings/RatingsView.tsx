@@ -7,57 +7,128 @@ import { taste, topRatedArtists, useDerivedTaste, useProfile, type Rating as Rat
 import { useSearchParams } from "next/navigation";
 import { MODES } from "@/lib/recommend/score";
 import { categorize } from "@/lib/recommend/tags";
-import { EmptyState, PageHeader, SectionTitle } from "@/components/Cards";
+import { EmptyState, PageHeader, SectionTitle, TrackRow } from "@/components/Cards";
 import { Artwork } from "@/components/Artwork";
-import { Rating } from "@/components/Actions";
+import { artistItem, Rating } from "@/components/Actions";
 import { QuickRateArtists } from "@/components/QuickRateArtists";
 import { artistHref, hrefFor } from "@/lib/util";
 import { imported as importedStore, useImported } from "@/lib/taste/imported";
 import { SpotifyImport } from "@/components/SpotifyImport";
 import { useEnriched } from "@/lib/client/data";
 import type { ImportedItem, SpotifyRange } from "@/lib/types";
+import { usePref } from "@/lib/client/prefs";
+import { FilterChips, LibrarySearch, matches, SortSelect, ViewToggle, type LibraryView } from "@/components/LibraryControls";
 
-const RANGE_LABEL: Record<SpotifyRange, string> = { long_term: "all-time", medium_term: "last 6 months", short_term: "last 4 weeks" };
+const RANGE_LABEL: Record<SpotifyRange, string> = { short_term: "last 4 weeks", medium_term: "last 6 months", long_term: "all-time" };
+const RANGES: { id: "all" | SpotifyRange; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "short_term", label: "Last 4 weeks" },
+  { id: "medium_term", label: "Last 6 months" },
+  { id: "long_term", label: "All-time" },
+];
 
-function ImportedRow({ it: raw }: { it: ImportedItem }) {
-  const [it] = useEnriched(useMemo(() => [raw], [raw]));
+/** One imported artist: rank, photo, name, and on hover your stars + remove. */
+function ImportedArtist({ it, rank, image }: { it: ImportedItem; rank?: number; image?: string }) {
   return (
-    <li className="flex items-center gap-3 rounded-md border border-line bg-elev p-2 transition-colors hover:bg-hl">
-      <Link href={hrefFor(it.kind, it.artist, it.title)} className="flex min-w-0 flex-1 items-center gap-3">
-        <Artwork src={it.image} alt={it.title} kind={it.kind} rounded={it.kind === "artist"} className="size-10 shrink-0" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{it.title}</span>
-          <span className="block truncate text-[13px] text-sub">
-            {it.kind === "artist" ? "Artist" : `Song · ${it.artist}`}
-          </span>
-          <span className="block truncate text-xs text-mute">
-            Top {it.kind === "artist" ? "artist" : "song"}: {it.ranges.map((r) => RANGE_LABEL[r]).join(", ")} · counts as {(it.weight * 4).toFixed(1)}★-ish
-          </span>
-        </span>
-      </Link>
-      <div className="shrink-0" title="Rate it yourself — your rating replaces the imported signal">
-        <Rating item={it} tags={it.tags} size={14} />
-      </div>
+    <li className="group relative rounded-lg border border-line bg-elev p-3 text-center transition-colors hover:bg-hl">
+      {rank != null && <span className="absolute left-2 top-2 text-xs tabular-nums text-mute">{rank}</span>}
       <button
         onClick={() => void importedStore.remove(it.key)}
         aria-label={`Remove ${it.title} from imported taste`}
         title="Remove from imported taste"
-        className="shrink-0 rounded-full p-1.5 text-mute hover:bg-hl-2 hover:text-ink"
+        className="absolute right-1.5 top-1.5 rounded p-1 text-mute opacity-0 transition-opacity hover:bg-hl-2 hover:text-ink group-hover:opacity-100 focus:opacity-100"
       >
-        <X className="size-4" />
+        <X className="size-3.5" />
       </button>
+      <Link href={artistHref(it.artist)} className="mx-auto block w-3/4">
+        <Artwork src={image ?? it.image} alt={it.title} kind="artist" className="aspect-square w-full" />
+      </Link>
+      <p className="mt-2 truncate text-sm font-medium">{it.title}</p>
+      <p className="truncate text-[11px] text-mute">{it.ranges.map((r) => RANGE_LABEL[r]).join(" · ")}</p>
+      <div className="mt-1.5 flex justify-center" title="Rate it yourself — your rating replaces the imported signal">
+        <Rating item={it} tags={it.tags} size={14} />
+      </div>
     </li>
   );
 }
 
-/** Spotify listening history: its own section, removable, always below your real ratings in weight. */
+const IMPORT_SORTS = ["most", "title", "artist"] as const;
+const byText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+
+function RemoveImported({ it, className = "" }: { it: ImportedItem; className?: string }) {
+  return (
+    <button
+      onClick={() => void importedStore.remove(it.key)}
+      aria-label={`Remove ${it.title} from imported taste`}
+      title="Remove from imported taste"
+      className={`rounded p-1 text-mute transition-opacity hover:bg-hl-2 hover:text-ink ${className}`}
+    >
+      <X className="size-3.5" />
+    </button>
+  );
+}
+
+function ImportedArtistRow({ it, rank, image }: { it: ImportedItem; rank?: number; image?: string }) {
+  return (
+    <li className="group flex items-center gap-3 rounded-md border border-line bg-elev p-2 transition-colors hover:bg-hl">
+      {rank != null && <span className="w-6 shrink-0 text-right text-xs tabular-nums text-mute">{rank}</span>}
+      <Link href={artistHref(it.artist)} className="flex min-w-0 flex-1 items-center gap-3">
+        <Artwork src={image ?? it.image} alt={it.title} kind="artist" className="size-10 shrink-0" />
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">{it.title}</span>
+          <span className="block truncate text-xs text-mute">{it.ranges.map((r) => RANGE_LABEL[r]).join(" · ")}</span>
+        </span>
+      </Link>
+      <Rating item={it} tags={it.tags} size={14} />
+      <RemoveImported it={it} className="opacity-100 focus:opacity-100 md:opacity-0 md:group-hover:opacity-100" />
+    </li>
+  );
+}
+
+function ImportedSongCard({ it }: { it: ImportedItem }) {
+  const [e] = useEnriched(useMemo(() => [it], [it]));
+  return (
+    <li className="group relative rounded-lg border border-line bg-elev p-3 transition-colors hover:bg-hl">
+      <RemoveImported it={it} className="absolute right-1.5 top-1.5 z-10 bg-elev/80 opacity-0 focus:opacity-100 group-hover:opacity-100" />
+      <Link href={hrefFor(it.kind, it.artist, it.title)} className="block">
+        <Artwork src={e.image ?? it.image} alt={it.title} kind="track" className="aspect-square w-full" />
+        <span className="mt-2 block truncate text-sm font-medium">{it.title}</span>
+        <span className="block truncate text-xs text-sub">{it.artist}</span>
+      </Link>
+      <div className="mt-1.5">
+        <Rating item={it} tags={it.tags} size={14} />
+      </div>
+    </li>
+  );
+}
+
+/** Spotify listening history: Top artists / Top songs, by period. Always weaker than your own stars. */
 function ImportedSection() {
   const p = useProfile();
   const imp = useImported();
+  const [view, setView] = useState<"artist" | "track">("artist");
+  const [range, setRange] = useState<"all" | SpotifyRange>("all");
   const [all, setAll] = useState(false);
+  const [q, setQ] = useState("");
+  const [sort, setSort] = usePref("spotify.sort", "most", IMPORT_SORTS);
+  const [artistView, setArtistView] = usePref<LibraryView>("spotify.artistView", "grid", ["grid", "list"] as const);
+  const [songView, setSongView] = usePref<LibraryView>("spotify.songView", "list", ["list", "grid"] as const);
+  const layout = view === "artist" ? artistView : songView;
+
   // Real ratings always win: items you rated yourself leave this list.
-  const items = imp.items.filter((it) => !p.ratings[it.key]);
+  const items = useMemo(() => imp.items.filter((it) => !p.ratings[it.key]), [imp.items, p.ratings]);
   const overridden = imp.items.length - items.length;
+  const inRange = useMemo(() => items.filter((it) => range === "all" || it.ranges.includes(range)), [items, range]);
+  const list = useMemo(() => {
+    const l = inRange.filter((it) => it.kind === view && matches(q, it.title, it.artist, it.album));
+    const most = (a: ImportedItem, b: ImportedItem) => b.weight - a.weight;
+    if (sort === "title") return l.sort((a, b) => byText(a.title, b.title));
+    if (sort === "artist") return l.sort((a, b) => byText(a.artist, b.artist) || most(a, b));
+    return l.sort(most);
+  }, [inRange, view, q, sort]);
+  const counts = { artist: inRange.filter((x) => x.kind === "artist").length, track: inRange.filter((x) => x.kind === "track").length };
+  const shown = all || q ? list : list.slice(0, view === "artist" ? 18 : 25);
+  const pics = useEnriched(useMemo(() => (view === "artist" ? shown.map((a) => artistItem(a.artist)) : []), [shown, view]));
 
   if (!imp.items.length) {
     return (
@@ -66,36 +137,122 @@ function ImportedSection() {
       </section>
     );
   }
-  const shown = all ? items : items.slice(0, 12);
+
   return (
     <section id="imported" aria-label="Imported from Spotify">
       <SectionTitle
-        sub={`Your Spotify top artists and songs${imp.user ? ` (${imp.user})` : ""}, imported ${new Date(imp.importedAt).toLocaleDateString()}. They shape recommendations a little less than your own stars${overridden ? ` — ${overridden} you rated yourself use your rating instead` : ""}.`}
+        sub={`What you play most on Spotify${imp.user ? ` (${imp.user})` : ""}, imported ${new Date(imp.importedAt).toLocaleDateString()}. It shapes recommendations a little less than your own stars${overridden ? `; ${overridden} you rated yourself use your rating instead` : ""}.`}
+        actions={
+          <>
+            <SpotifyImport variant="panel" />
+            <button
+              onClick={() => {
+                if (window.confirm("Remove everything imported from Spotify? Your own ratings stay.")) void importedStore.removeAll();
+              }}
+              className="btn btn-danger"
+            >
+              <Trash2 className="size-4" /> Remove all
+            </button>
+          </>
+        }
       >
-        <span className="flex items-center gap-2">
-          Imported from Spotify
-          <span className="text-sm font-normal text-mute">{items.length}</span>
-        </span>
+        Your Spotify favourites
       </SectionTitle>
-      <div className="mb-3 flex flex-wrap items-center gap-2 px-4 md:px-8">
-        <SpotifyImport variant="panel" />
-        <button
-          onClick={() => {
-            if (window.confirm("Remove everything imported from Spotify? Your own ratings stay.")) void importedStore.removeAll();
-          }}
-          className="btn btn-danger"
-        >
-          <Trash2 className="size-4" /> Remove all imported
-        </button>
+
+      <div className="flex flex-wrap items-center gap-3 px-4 md:px-8">
+        <div className="flex gap-0.5 rounded-md border border-line bg-base p-0.5" role="tablist" aria-label="Show">
+          {(["artist", "track"] as const).map((k) => (
+            <button
+              key={k}
+              role="tab"
+              aria-selected={view === k}
+              onClick={() => {
+                setView(k);
+                setAll(false);
+              }}
+              className={`rounded px-3 py-1.5 text-[13px] transition-colors ${view === k ? "bg-hl text-ink" : "text-sub hover:text-ink"}`}
+            >
+              {k === "artist" ? "Top artists" : "Top songs"} <span className="tabular-nums text-mute">{counts[k]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Period">
+          {RANGES.map((r) => (
+            <button
+              key={r.id}
+              role="radio"
+              aria-checked={range === r.id}
+              onClick={() => {
+                setRange(r.id);
+                setAll(false);
+              }}
+              className="option rounded-full px-3 py-1 text-[13px]"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <LibrarySearch value={q} onChange={setQ} placeholder={view === "artist" ? "Search top artists" : "Search top songs"} />
+          <SortSelect
+            value={view === "artist" && sort === "artist" ? "title" : sort}
+            onChange={setSort}
+            options={[
+              { id: "most" as const, label: "Most played" },
+              { id: "title" as const, label: view === "artist" ? "Name A–Z" : "Title A–Z" },
+              ...(view === "track" ? [{ id: "artist" as const, label: "Artist A–Z" }] : []),
+            ]}
+          />
+          <ViewToggle value={layout} onChange={view === "artist" ? setArtistView : setSongView} views={view === "artist" ? ["grid", "list"] : ["list", "grid"]} />
+        </div>
       </div>
-      <ul className="grid gap-1.5 px-4 md:px-8 xl:grid-cols-2">
-        {shown.map((it) => (
-          <ImportedRow key={it.key} it={it} />
-        ))}
-      </ul>
-      {items.length > shown.length || all ? (
+
+      {list.length === 0 ? (
+        <p className="px-4 pt-4 text-sm text-sub md:px-8">{q ? `Nothing matches “${q}”.` : "Nothing here for this period."}</p>
+      ) : layout === "list" && view === "artist" ? (
+        <ul className="mt-3 grid gap-1.5 px-4 md:px-8 xl:grid-cols-2">
+          {shown.map((it, i) => (
+            <ImportedArtistRow key={it.key} it={it} rank={sort === "most" ? i + 1 : undefined} image={pics[i]?.image} />
+          ))}
+        </ul>
+      ) : layout === "grid" && view === "track" ? (
+        <ul className="mt-4 grid grid-cols-2 gap-2 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 xl:grid-cols-6">
+          {shown.map((it) => (
+            <ImportedSongCard key={it.key} it={it} />
+          ))}
+        </ul>
+      ) : view === "artist" ? (
+        <ul className="mt-4 grid grid-cols-2 gap-2 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 xl:grid-cols-6">
+          {shown.map((it, i) => (
+            <ImportedArtist key={it.key} it={it} rank={sort === "most" ? i + 1 : undefined} image={pics[i]?.image} />
+          ))}
+        </ul>
+      ) : (
+        <div className="mt-3 md:px-4">
+          {shown.map((it, i) => (
+            <TrackRow
+              key={it.key}
+              item={it}
+              index={sort === "most" ? i + 1 : undefined}
+              queue={shown}
+              showAlbum
+              extra={
+                <button
+                  onClick={() => void importedStore.remove(it.key)}
+                  aria-label={`Remove ${it.title} from imported taste`}
+                  title="Remove from imported taste"
+                  className="rounded p-1.5 text-mute opacity-100 transition-opacity hover:bg-hl hover:text-ink md:opacity-0 md:group-hover:opacity-100"
+                >
+                  <X className="size-4" />
+                </button>
+              }
+            />
+          ))}
+        </div>
+      )}
+      {list.length > shown.length || all ? (
         <button onClick={() => setAll(!all)} className="btn btn-ghost btn-sm mx-4 mt-3 md:mx-8">
-          {all ? "Show fewer" : `Show all ${items.length}`}
+          {all ? "Show fewer" : `Show all ${list.length}`}
         </button>
       ) : null}
     </section>
@@ -114,9 +271,40 @@ function modeLabel(id?: string) {
   return MODES.find((m) => m.id === id)?.label ?? id;
 }
 
-function RatedRow({ r }: { r: RatingEntry }) {
+function RatedRow({ r, view }: { r: RatingEntry; view: LibraryView }) {
   // Older ratings were saved without artwork (or with Last.fm's); fetch the verified cover.
   const [it] = useEnriched(useMemo(() => [r.item], [r.item]));
+  const kind = it.kind === "track" ? "Song" : it.kind === "album" ? "Album" : "Artist";
+  if (view === "grid") {
+    return (
+      <li className="rounded-lg border border-line bg-elev p-3 transition-colors hover:bg-hl">
+        <Link href={hrefFor(it.kind, it.artist, it.title)} className="block">
+          <Artwork src={it.image} alt={it.title} kind={it.kind} className="aspect-square w-full" />
+          <span className="mt-2 block truncate text-sm font-medium">{it.title}</span>
+          <span className="block truncate text-xs text-sub">
+            {kind}
+            {it.kind !== "artist" && ` · ${it.artist}`}
+          </span>
+        </Link>
+        <div className="mt-1.5">
+          <Rating item={it} tags={r.tags} ctx={r.ctx} size={14} />
+        </div>
+      </li>
+    );
+  }
+  if (view === "compact") {
+    return (
+      <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-line px-2 py-1.5 text-[13px] transition-colors last:border-0 hover:bg-hl sm:grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_5rem_auto_6rem]">
+        <Link href={hrefFor(it.kind, it.artist, it.title)} className="truncate font-medium hover:underline">
+          {it.title}
+        </Link>
+        <span className="hidden truncate text-sub sm:block">{it.kind !== "artist" ? it.artist : ""}</span>
+        <span className="hidden text-sub sm:block">{kind}</span>
+        <Rating item={it} tags={r.tags} ctx={r.ctx} size={14} />
+        <span className="hidden text-right tabular-nums text-mute sm:block">{new Date(r.at).toLocaleDateString()}</span>
+      </li>
+    );
+  }
   return (
     <li className="flex items-center gap-3 rounded-md border border-line bg-elev p-2 transition-colors hover:bg-hl">
       <Link href={hrefFor(it.kind, it.artist, it.title)} className="flex min-w-0 flex-1 items-center gap-3">
@@ -124,7 +312,7 @@ function RatedRow({ r }: { r: RatingEntry }) {
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{it.title}</span>
           <span className="block truncate text-[13px] text-sub">
-            <span className="capitalize">{it.kind === "track" ? "Song" : it.kind}</span>
+            {kind}
             {it.kind !== "artist" && ` · ${it.artist}`}
           </span>
           {r.ctx?.seed && (
@@ -139,6 +327,133 @@ function RatedRow({ r }: { r: RatingEntry }) {
         <Rating item={it} tags={r.tags} ctx={r.ctx} size={16} />
       </div>
     </li>
+  );
+}
+
+const KINDS = ["all", "track", "artist", "album"] as const;
+const SORTS = ["recent", "high", "low", "title", "artist", "stars"] as const;
+type SortId = (typeof SORTS)[number];
+const SORT_LABEL: Record<SortId, string> = {
+  recent: "Recently rated",
+  high: "Rating: high to low",
+  low: "Rating: low to high",
+  title: "Title A–Z",
+  artist: "Artist A–Z",
+  stars: "Grouped by stars",
+};
+const VIEWS = ["list", "compact", "grid"] as const;
+const PAGE = 60;
+
+function RatedList({ rows, view }: { rows: RatingEntry[]; view: LibraryView }) {
+  const cls =
+    view === "grid"
+      ? "grid grid-cols-2 gap-2 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 xl:grid-cols-6"
+      : view === "compact"
+        ? "mx-4 rounded-md border border-line bg-elev md:mx-8"
+        : "grid gap-1.5 px-4 md:px-8 xl:grid-cols-2";
+  return (
+    <ul className={cls}>
+      {rows.map((r) => (
+        <RatedRow key={r.item.key} r={r} view={view} />
+      ))}
+    </ul>
+  );
+}
+
+/** Your ratings like Spotify's library: Songs / Artists / Albums, search, sort and list, compact or grid. */
+function RatingsLibrary({ all }: { all: RatingEntry[] }) {
+  const [kind, setKind] = usePref("ratings.kind", "all", KINDS);
+  const [sort, setSort] = usePref<SortId>("ratings.sort", "recent", SORTS);
+  const [view, setView] = usePref<LibraryView>("ratings.view", "list", VIEWS);
+  const [q, setQ] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  const counts = useMemo(() => {
+    const c = { all: all.length, track: 0, artist: 0, album: 0 };
+    for (const r of all) c[r.item.kind] += 1;
+    return c;
+  }, [all]);
+  const rows = useMemo(() => {
+    const list = all.filter((r) => (kind === "all" || r.item.kind === kind) && matches(q, r.item.title, r.item.artist, r.item.album));
+    const recent = (a: RatingEntry, b: RatingEntry) => b.at - a.at;
+    const sorters: Record<SortId, (a: RatingEntry, b: RatingEntry) => number> = {
+      recent,
+      high: (a, b) => b.rating - a.rating || recent(a, b),
+      low: (a, b) => a.rating - b.rating || recent(a, b),
+      title: (a, b) => byText(a.item.title, b.item.title),
+      artist: (a, b) => byText(a.item.artist, b.item.artist) || byText(a.item.title, b.item.title),
+      stars: (a, b) => b.rating - a.rating || recent(a, b),
+    };
+    return list.sort(sorters[sort]);
+  }, [all, kind, q, sort]);
+  const shown = showAll || q ? rows : rows.slice(0, PAGE);
+
+  return (
+    <section aria-label="Your ratings">
+      <div className="mt-6 flex flex-wrap items-center gap-3 px-4 md:px-8">
+        <FilterChips
+          label="Show"
+          value={kind}
+          onChange={(k) => {
+            setKind(k);
+            setShowAll(false);
+          }}
+          options={[
+            { id: "all", label: "All", count: counts.all },
+            { id: "track", label: "Songs", count: counts.track },
+            { id: "artist", label: "Artists", count: counts.artist },
+            { id: "album", label: "Albums", count: counts.album },
+          ].filter((o) => o.id === "all" || o.count > 0) as { id: (typeof KINDS)[number]; label: string; count: number }[]}
+        />
+        <div className="ml-auto flex items-center gap-2">
+          <LibrarySearch value={q} onChange={setQ} placeholder="Search in My ratings" />
+          <SortSelect value={sort} onChange={setSort} options={SORTS.map((id) => ({ id, label: SORT_LABEL[id] }))} />
+          <ViewToggle value={view} onChange={setView} />
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 pt-6 text-sm text-sub md:px-8">{q ? `Nothing in your ratings matches “${q}”.` : "Nothing rated here yet."}</p>
+      ) : sort === "stars" ? (
+        GROUPS.map((g) => {
+          const group = shown.filter((r) => r.rating === g.stars);
+          if (!group.length) return null;
+          return (
+            <section key={g.stars}>
+              <SectionTitle>
+                <span className="flex items-center gap-2">
+                  <span className={`flex items-center gap-0.5 ${g.stars === 1 ? "text-danger" : "text-find"}`}>
+                    {g.stars}
+                    <Star className={`size-4 ${g.stars === 1 ? "fill-danger" : "fill-find"}`} />
+                  </span>
+                  {g.title}
+                  <span className="text-sm font-normal text-mute">{rows.filter((r) => r.rating === g.stars).length}</span>
+                </span>
+              </SectionTitle>
+              <RatedList rows={group} view={view} />
+            </section>
+          );
+        })
+      ) : (
+        <div className="mt-4">
+          {view === "compact" && (
+            <div className="mx-4 hidden grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_5rem_auto_6rem] gap-3 px-2 pb-1.5 text-xs text-mute sm:grid md:mx-8">
+              <span>Title</span>
+              <span>Artist</span>
+              <span>Type</span>
+              <span className="w-[86px]">Rating</span>
+              <span className="text-right">Rated</span>
+            </div>
+          )}
+          <RatedList rows={shown} view={view} />
+        </div>
+      )}
+      {rows.length > PAGE && !q && (
+        <button onClick={() => setShowAll(!showAll)} className="btn btn-ghost btn-sm mx-4 mt-3 md:mx-8">
+          {showAll ? "Show fewer" : `Show all ${rows.length}`}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -321,29 +636,7 @@ export function RatingsView() {
                 </ul>
               </>
             )}
-            {GROUPS.map((g) => {
-              const rows = all.filter((r) => r.rating === g.stars);
-              if (!rows.length) return null;
-              return (
-                <section key={g.stars}>
-                  <SectionTitle>
-                    <span className="flex items-center gap-2">
-                      <span className={`flex items-center gap-0.5 ${g.stars === 1 ? "text-danger" : "text-find"}`}>
-                        {g.stars}
-                        <Star className={`size-4 ${g.stars === 1 ? "fill-danger" : "fill-find"}`} />
-                      </span>
-                      {g.title}
-                      <span className="text-sm font-normal text-mute">{rows.length}</span>
-                    </span>
-                  </SectionTitle>
-                  <ul className="grid gap-1.5 px-4 md:px-8 xl:grid-cols-2">
-                    {rows.map((r) => (
-                      <RatedRow key={r.item.key} r={r} />
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
+            <RatingsLibrary all={all} />
 
             <div className="mt-12 flex items-center gap-3 px-4 md:px-8">
               <p className="text-xs text-mute">Your ratings and imported Spotify taste are stored only on this Mac.</p>

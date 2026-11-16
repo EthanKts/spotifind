@@ -12,7 +12,7 @@ import { hoverPrefetch, playableOnSpotify, recommendUrl, useEnriched, useJson, u
 import { hrefFor } from "@/lib/util";
 import { Artwork } from "./Artwork";
 import { ArtistLine, ExploreButton, OpenInSpotify, PlayButton, Rating } from "./Actions";
-import { CardSkeleton } from "./Cards";
+import { CardSkeleton, ErrorState } from "./Cards";
 
 // ------------------------------------------------------------------ data hook
 
@@ -141,6 +141,7 @@ export function DiscoveryPanel({
             value={pct}
             onChange={(e) => setAdventure(Number(e.target.value) / 100)}
             aria-label="Adventurousness: from very similar to more adventurous"
+                title="Left: songs closest to what you picked. Right: further away, with artists you probably don’t know yet."
             className="sf-range always-thumb mt-2 w-full"
             style={{ ["--range-pct" as string]: `${pct}%`, ["--range-fill" as string]: "var(--color-find)" }}
           />
@@ -165,7 +166,7 @@ export function DiscoveryPanel({
 
 // ------------------------------------------------------------------ recommendation card
 
-export function RecommendationCard({ r, item, queue, seedTitle, mode }: { r: Ranked; item: Item; queue: Item[]; seedTitle: string; mode: Mode }) {
+export function RecommendationCard({ r, item, queue, seedTitle, mode, priority }: { r: Ranked; item: Item; queue: Item[]; seedTitle: string; mode: Mode; priority?: boolean }) {
   const c: Candidate = r.c;
   const score = displayScore(c);
   const year = useYear(item);
@@ -174,7 +175,7 @@ export function RecommendationCard({ r, item, queue, seedTitle, mode }: { r: Ran
     <article {...hoverPrefetch(item)} className="group relative flex flex-col rounded-lg border border-line bg-elev p-2.5 transition-colors hover:border-hl-2">
       <div className="relative">
         <Link href={href} onClick={() => taste.recordDiscovered(item, seedTitle)} aria-label={`Open ${item.title}`}>
-          <Artwork src={item.image} alt={item.title} kind={item.kind} className="aspect-square w-full" />
+          <Artwork src={item.image} alt={item.title} kind={item.kind} priority={priority} className="aspect-square w-full" />
         </Link>
         {score && (
           <span
@@ -301,7 +302,7 @@ export function DiscoverView({
             </div>
           </>
         )}
-        {error && <p className="px-4 text-sm text-danger md:px-8">Couldn&apos;t load recommendations: {error}</p>}
+        {error && <ErrorState title="Couldn’t load recommendations" message={error} />}
         {data && ranked.length === 0 && (
           <p className="px-4 text-sm text-sub md:px-8">
             {data.candidates.length === 0
@@ -312,7 +313,7 @@ export function DiscoverView({
         {ranked.length > 0 && (
           <div key={`${mode}-${kind}`} className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 xl:grid-cols-5">
             {ranked.map((r, i) => (
-              <RecommendationCard key={r.c.key} r={r} item={items[i]} queue={items.filter((x) => x.kind === "track")} seedTitle={seedTitle} mode={mode} />
+              <RecommendationCard key={r.c.key} r={r} item={items[i]} queue={items.filter((x) => x.kind === "track")} seedTitle={seedTitle} mode={mode} priority={i < 5} />
             ))}
           </div>
         )}

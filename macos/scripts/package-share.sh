@@ -28,6 +28,7 @@ value() { # KEY → value from your config.env, then .env.local
 
 LASTFM="$(value LASTFM_API_KEY)"
 CLIENT="$(value SPOTIFY_CLIENT_ID)"
+DISCOGS="$(value DISCOGS_TOKEN)"   # optional; bundled by your choice (it gives access to your Discogs account)
 NAME="${SPOTIFIND_SHARED_BY:-$(id -F 2>/dev/null | awk '{print $1}')}"
 [ -n "$LASTFM" ] || { echo "No LASTFM_API_KEY in $SUPPORT/config.env — set up Spotifind yourself first." >&2; exit 1; }
 [ -n "$CLIENT" ] || { echo "No SPOTIFY_CLIENT_ID in $SUPPORT/config.env — connect Spotify in Spotifind first." >&2; exit 1; }
@@ -36,9 +37,10 @@ NAME="${SPOTIFIND_SHARED_BY:-$(id -F 2>/dev/null | awk '{print $1}')}"
 
 SHARED="$(mktemp -d)/shared.env"
 {
-  echo "# Built into this shared copy of Spotifind by $NAME. Public identifiers only — no logins or secrets."
+  echo "# Built into this shared copy of Spotifind by $NAME: Last.fm key, Spotify Client ID${DISCOGS:+ and Discogs token}. No Spotify login or client secret."
   echo "LASTFM_API_KEY=$LASTFM"
   echo "SPOTIFY_CLIENT_ID=$CLIENT"
+  [ -n "$DISCOGS" ] && echo "DISCOGS_TOKEN=$DISCOGS"
   echo "SHARED_BY=$NAME"
 } > "$SHARED"
 
@@ -59,13 +61,14 @@ for f in config.env spotify-auth.json spotify-import.json; do
   if find "$APP" -name "$f" | grep -q .; then echo "!! $f inside the bundle" >&2; leak=1; fi
 done
 if find "$APP" -name ".env*" | grep -q .; then echo "!! .env file inside the bundle" >&2; leak=1; fi
-# The shared keys may appear only in shared.env.
-for v in "$LASTFM" "$CLIENT"; do
+# The shared keys (Last.fm key, Spotify Client ID, Discogs token) may appear only in shared.env.
+for v in "$LASTFM" "$CLIENT" "$DISCOGS"; do
+  [ -z "$v" ] && continue
   others="$(grep -rlF -- "$v" "$APP" | grep -v '/Contents/Resources/shared.env$' || true)"
   [ -z "$others" ] || { echo "!! a shared key also appears in: $others" >&2; leak=1; }
 done
 [ "$leak" = 0 ] || { echo "Refusing to package." >&2; exit 1; }
-echo "OK — only your Last.fm key and Spotify Client ID (in Resources/shared.env)"
+echo "OK — only your Last.fm key, Spotify Client ID${DISCOGS:+ and Discogs token} (in Resources/shared.env)"
 
 echo "==> Packaging"
 rm -rf "$DIST"

@@ -16,13 +16,14 @@ export async function GET(req: NextRequest) {
   const infoP = hasLf ? lf.artistInfo(name).catch(() => undefined) : Promise.resolve(undefined);
   const topP = hasLf ? lf.artistTopTracks(name, 20).catch(() => []) : Promise.resolve([]);
   const dzArtistP = dz.findArtist(name).catch(() => undefined);
-  // MusicBrainz (1 req/s, shared with release-year lookups) only gets 2 s; Deezer's album list is the fallback.
+  // MusicBrainz (1 req/s, shared with release-year lookups) gets 0.7 s; Deezer's album list is the fallback.
+  // A slower answer still lands in the disk cache, so the next visit shows the studio discography.
   const studioP = within(
     infoP.then(async (i) => {
       const id = i?.mbid ?? (await mb.findArtistMbid(i?.name ?? name).catch(() => undefined));
       return { mbid: id, albums: id ? await mb.studioAlbums(id).catch(() => []) : [] };
     }),
-    1500,
+    700,
     { mbid: undefined as string | undefined, albums: [] as { id: string; title: string; year?: number }[] },
   );
   const [info, top, topAlbums, similar, dzArtist, studioRes, tagList, dzExtra] = await Promise.all([

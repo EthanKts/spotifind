@@ -44,6 +44,33 @@ lo-fi, lofi, hi-fi, analog, analogue, warm production, polished, raw, bedroom po
 90s, 00s, 2000s, 2010s, 2020s, retro, vintage, modern, futuristic, minimal, maximalist, wall of sound, reverb, tape
 `);
 
+/** Instruments you can filter on, with the Last.fm tags that mean "this features it". */
+export const INSTRUMENTS: { id: string; label: string; tags: string[] }[] = [
+  { id: "guitar", label: "Guitar", tags: ["guitar", "electric guitar", "acoustic guitar", "guitarist", "guitar virtuoso", "jazz guitar", "blues guitar", "fingerstyle", "surf", "surf rock", "shred"] },
+  { id: "piano", label: "Piano / keys", tags: ["piano", "pianist", "solo piano", "jazz piano", "rhodes", "fender rhodes", "keys", "keyboard", "electric piano", "neo-classical", "neoclassical"] },
+  { id: "saxophone", label: "Saxophone", tags: ["saxophone", "sax", "tenor sax", "alto sax", "tenor saxophone", "saxophonist"] },
+  { id: "brass", label: "Brass / horns", tags: ["trumpet", "brass", "horns", "horn section", "brass band", "trombone", "trumpeter"] },
+  { id: "strings", label: "Strings", tags: ["strings", "violin", "cello", "string quartet", "orchestral", "orchestra", "chamber music", "chamber pop"] },
+  { id: "synth", label: "Synths", tags: ["synth", "synthesizer", "synths", "analog synth", "synthpop", "synth-pop", "synthwave", "modular synth", "electronic", "electronica"] },
+  { id: "bass", label: "Bass", tags: ["bass", "bassline", "slap bass", "funk bass", "bassist", "dub", "jazz-funk"] },
+  { id: "drums", label: "Drums / percussion", tags: ["drums", "percussion", "drummer", "breakbeat", "breaks", "drum and bass", "afrobeat", "latin percussion"] },
+  { id: "organ", label: "Organ", tags: ["organ", "hammond", "hammond organ", "soul jazz"] },
+  { id: "instrumental", label: "Instrumental (no vocals)", tags: ["instrumental", "instrumental hip-hop", "post-rock"] },
+  { id: "acoustic", label: "Acoustic", tags: ["acoustic", "unplugged", "folk", "singer-songwriter", "acoustic guitar"] },
+];
+
+/** Tags that suggest high / low energy. Only used for songs whose audio couldn't be measured. */
+export const HIGH_ENERGY = list(`
+energetic, high energy, upbeat, party, dance, edm, drum and bass, dnb, jungle, techno, hardcore, punk, punk rock, metal,
+heavy metal, hard rock, thrash metal, aggressive, intense, euphoric, anthemic, house, electro, big beat, garage rock, ska,
+dancehall, disco, funk, grime, trap, hyperpop, rave, workout, running
+`);
+export const LOW_ENERGY = list(`
+chill, chillout, chill out, mellow, relaxing, relax, calm, peaceful, soothing, ambient, sleep, slow, ballad, ballads,
+downtempo, lo-fi, lofi, acoustic, singer-songwriter, sad, melancholic, melancholy, dreamy, ethereal, minimalism, new age,
+meditation, lullaby, quiet, soft, easy listening, smooth jazz, bossa nova, slowcore, dream pop
+`);
+
 export type TagCategory = "groove" | "mood" | "vocal" | "production" | "other";
 
 export function categorize(tag: string): TagCategory {

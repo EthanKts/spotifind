@@ -121,3 +121,32 @@ The Claude Code status line shows the percentage of checked boxes in this file.
 - [x] Step-by-step setup wizard with progress and quick tour
 - [x] Help menu: Setup Guide + Report a problem
 - [x] Guide, README, rebuild and test
+
+## Energy, instruments, genres + organised Spotify tab (round 13)
+- [x] Real audio features (ReccoBeats) with cache + rate limits
+- [x] Energy bar + instrument filter (shape layer)
+- [x] Explore a genre matched to my taste
+- [x] Controls in Playlists + Rapid-fire; genre page buttons
+- [x] From Spotify tab: top artists / top songs, by period
+- [x] Build from several songs/albums/artists at once (up to 5)
+- [x] Docs, rebuild app + share package, test
+
+## Big upgrade (round 14)
+- [x] Phase 1: speed + image loading (right-sized images, /api/img proxy, parallel enrichment)
+- [x] Phase 2: grouped collapsible sidebar, ⌘K palette, ? shortcuts, Settings, Genres, error states
+- [x] Phase 3: ListenBrainz + Discogs + audio in pipeline, weights.ts, eval script, data coverage
+- [x] Phase 4: Vibe Dial
+- [x] Phase 4: Time Machine
+- [x] Phase 4: Trail + Saved trails
+- [x] Phase 4: Smooth flow playlists
+- [x] Phase 5: docs + share package
+
+## Trim + precise genres + better playlists (round 15)
+- [x] Remove Vibe Dial, Time Machine and Trails
+- [x] Playlists like before: extra ranking components off, no ListenBrainz-only artists
+- [x] Variety: one per album, no long runs of one genre tag, more similar artists for sparse songs
+- [x] Precise subgenres (Discogs styles + Last.fm tags) with membership checks
+- [x] Up to 5 genres per playlist / Rapid-fire, balanced; family picker with search; Genres page
+- [x] My ratings: Spotify-style chips, search, sort, list/compact/grid (Ratings + From Spotify)
+- [x] Docs, rebuild app + share package, test
+

@@ -83,6 +83,7 @@ function RecShelf({
           <ShelfItem key={it.key}>
             <MediaCard
               item={it}
+              priority={i < 6}
               queue={items.filter((x) => x.kind === "track")}
               badge={s && <span className="rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-ink">{Math.round(s.value * 100)}%</span>}
             />

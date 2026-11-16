@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, ClipboardCopy, Loader2, Pencil, RefreshCw, Shuffle, Trash2 } from "lucide-react";
+import { Check, ClipboardCopy, Loader2, Pencil, RefreshCw, Shuffle, Trash2, Waves } from "lucide-react";
+import { smoothFlow } from "@/lib/client/flow";
 import { useMemo, useState } from "react";
 import { taste, useProfile, useTasteInput } from "@/lib/taste/profile";
 import { generatePlaylist, modeLabel, seedName } from "@/lib/client/playlist";
@@ -132,6 +133,23 @@ export function PlaylistView() {
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           {busy ?? "Regenerate"}
+        </button>
+        <button
+          onClick={async () => {
+            setBusy("Measuring tempo and energy…");
+            try {
+              const { order, measured } = await smoothFlow(tracks, (d, t) => t && setBusy(`Measuring tempo and energy… ${d}/${t}`));
+              if (measured < 3) alert("Not enough songs could be measured to reorder this playlist.");
+              else taste.updatePlaylist(pl.id, { tracks: order.map((x) => pl.tracks.find((y) => y.key === x.key) ?? x) });
+            } finally {
+              setBusy(null);
+            }
+          }}
+          disabled={!!busy}
+          title="Reorder like a DJ set: each song close in tempo and energy to the one before"
+          className="btn btn-secondary"
+        >
+          <Waves className="size-4" /> Smooth flow
         </button>
         <button onClick={copy} className="btn btn-secondary">
           {copied ? <Check className="size-4 text-find" /> : <ClipboardCopy className="size-4" />}

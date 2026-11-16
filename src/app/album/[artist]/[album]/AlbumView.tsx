@@ -8,7 +8,7 @@ import { albumUrl, useJson } from "@/lib/client/data";
 import { useDerivedTaste } from "@/lib/taste/profile";
 import { cosine, formatCount } from "@/lib/util";
 import { SeedHeader } from "@/components/SeedHeader";
-import { MediaCard, SectionTitle, Shelf, ShelfItem, TrackRow } from "@/components/Cards";
+import { MediaCard, SectionTitle, Shelf, ShelfItem, TrackRow, ErrorState } from "@/components/Cards";
 import { useRanked, useRecommendations } from "@/components/Discovery";
 import { discoverHref } from "@/components/Actions";
 import { TagChips } from "@/components/TagChips";
@@ -68,7 +68,7 @@ export function AlbumView({ artist, title }: { artist: string; title: string }) 
         }
       />
       {loading && <p className="px-4 text-sub md:px-8">Loading tracklist and listening data…</p>}
-      {error && <p className="px-4 text-danger md:px-8">Couldn&apos;t load this album: {error}</p>}
+      {error && <ErrorState title="Couldn’t load this album" message={error} />}
 
       {data && (
         <>

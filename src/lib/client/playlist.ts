@@ -5,11 +5,15 @@
 // ranked with the chosen style + adventurousness + your taste, then capped per artist.
 
 import type { Candidate, Enrichment, ImportedItem, Item, RecommendResponse, Seed, TagVector } from "../types";
-import { MODES, rank, type Mode, type TasteInput } from "../recommend/score";
+import { MODES, rank, type Mode, type Ranked, type TasteInput } from "../recommend/score";
+import { applyShape, shapeActive, type Shape } from "../recommend/shape";
+import { INSTRUMENTS } from "../recommend/tags";
+import { getFeatures, unmeasured } from "./features";
 import { displayScore, explain } from "../recommend/explain";
 import type { Playlist, PlaylistSettings, Profile } from "../taste/profile";
 import { recommendUrl } from "./data";
 import { itemKey } from "../util";
+import { genreNames, genresOf, resolveGenre } from "../recommend/genres";
 
 export const PLAYLIST_LENGTH = 15;
 export const LENGTH_CHOICES = [10, 15, 20, 25, 30, 40, 50];
@@ -42,6 +46,100 @@ export function tasteSeeds(p: Profile, n = 3, imported: ImportedItem[] = []): Pl
 
 export function seedName(s: PlaylistSettings["seeds"][number]) {
   return s.kind === "artist" ? s.artist : s.title;
+}
+
+/** What a playlist / session was built from, for labels: "your taste", "jazz for you", "Chameleon + 2 more". */
+export function basisLabel(s: Pick<PlaylistSettings, "basis" | "seeds" | "genre" | "genres">) {
+  if (s.basis === "taste") return "your taste";
+  if (s.basis === "genre") return `${genreNames(genresOf(s)) || "a genre"} for you`;
+  if (!s.seeds.length) return "";
+  return s.seeds.length === 1 ? seedName(s.seeds[0]) : `${seedName(s.seeds[0])} + ${s.seeds.length - 1} more`;
+}
+
+export function shapeOf(s: Pick<PlaylistSettings, "energy" | "instruments">): Shape {
+  return { energy: s.energy ?? null, instruments: s.instruments ?? [] };
+}
+
+/** Your positive taste tags with the genres' own tags left out, so genre songs are matched on the rest of your taste. */
+function tasteSeedTags(taste: TasteInput, genres: string[]): TagVector {
+  const tags = genres.flatMap((g) => resolveGenre(g).lastfm);
+  const words = tags.flatMap((g) => g.split(/[\s-]+/)).filter((w) => w.length > 2);
+  const out: TagVector = {};
+  for (const [t, w] of Object.entries(taste.tags)) {
+    if (w <= 0 || tags.includes(t) || words.some((g) => t.includes(g))) continue;
+    out[t] = w;
+  }
+  const max = Math.max(1e-9, ...Object.values(out));
+  for (const t of Object.keys(out)) out[t] /= max;
+  return Object.keys(out).length ? out : Object.fromEntries(tags.slice(0, 1).map((t) => [t, 1]));
+}
+
+/** Songs in 1–5 subgenres, plus bridges from your favourite artists into them (see recommend/genre.ts). */
+export async function fetchGenrePool(
+  genres: string[],
+  loved: PlaylistSettings["seeds"],
+  taste: TasteInput,
+  depth: "lite" | "full",
+): Promise<Pool> {
+  const q = new URLSearchParams({ genres: genres.join("|"), loved: [...new Set(loved.map((s) => s.artist))].slice(0, 5).join("|"), depth });
+  const res = await fetch(`/api/recommend/genre?${q}`)
+    .then((r) => r.json() as Promise<RecommendResponse & { support?: Record<string, number> }>)
+    .catch(() => null);
+  return {
+    candidates: (res?.candidates ?? []).filter((c) => c.kind === "track"),
+    seed: res?.seed ? { ...res.seed, tags: tasteSeedTags(taste, genres) } : null,
+    // Songs that fit several of the chosen genres rank a little higher.
+    support: new Map(Object.entries(res?.support ?? {})),
+  };
+}
+
+/**
+ * Songs that feature the chosen instruments: songs similar to your picks are rarely tagged with an
+ * instrument, so pull in songs from each instrument's own listener tag ("saxophone"), favouring artists
+ * similar to your picks (the same bridge idea as exploring a genre). Each gets the tag so the filter keeps it.
+ */
+export async function instrumentCandidates(instruments: string[], loved: PlaylistSettings["seeds"], taste: TasteInput, depth: "lite" | "full"): Promise<Candidate[]> {
+  const defs = INSTRUMENTS.filter((i) => instruments.includes(i.id) && i.id !== "acoustic");
+  const pools = await Promise.all(defs.map((d) => fetchGenrePool([d.tags[0]], loved, taste, depth).catch(() => null)));
+  const out: Candidate[] = [];
+  pools.forEach((pool, i) => {
+    for (const c of pool?.candidates ?? []) out.push({ ...c, tags: { ...c.tags, [defs[i].tags[0]]: Math.max(c.tags[defs[i].tags[0]] ?? 0, 0.5) } });
+  });
+  return out;
+}
+
+/**
+ * Energy + instrument filter on top of the ranking: enrich the best candidates (to learn their Deezer
+ * previews), measure their energy, then re-order. Returns the new order plus per-song notes.
+ */
+export async function shapeRanked(
+  ranked: Ranked[],
+  shape: Shape,
+  need: number,
+  onProgress?: (msg: string) => void,
+  known: Record<string, Enrichment> = {},
+): Promise<{ ranked: Ranked[]; notes: Map<string, string>; relaxed?: string; extra: Record<string, Enrichment> }> {
+  const head = ranked.slice(0, Math.min(ranked.length, need * 4 + 30, 120));
+  const missing = head.filter((r) => !known[r.c.key]).map((r) => r.c);
+  const extra = { ...known, ...(missing.length ? await enrich(missing) : {}) };
+  const wantsAudio = shape.energy != null || shape.instruments.some((i) => i === "instrumental" || i === "acoustic");
+  let feats = new Map<number, import("../types").AudioFeatures | null>();
+  if (wantsAudio) {
+    const ids = head.map((r) => extra[r.c.key]?.deezerId).filter((x): x is number => !!x);
+    const todo = unmeasured(ids);
+    onProgress?.(todo ? `Measuring the energy of ${todo} songs (only the first time)…` : "Matching energy…");
+    feats = await getFeatures(ids, (done, total) => total && onProgress?.(`Measuring the energy of songs… ${done}/${total}`));
+  }
+  const shaped = applyShape(
+    head,
+    shape,
+    (r) => {
+      const id = extra[r.c.key]?.deezerId;
+      return id ? feats.get(id) : undefined;
+    },
+    need,
+  );
+  return { ...shaped, extra };
 }
 
 function mergeSeedTags(seeds: (Seed | null)[]): TagVector {
@@ -104,7 +202,10 @@ export async function fetchPool(seeds: PlaylistSettings["seeds"], depth: "lite" 
   };
 }
 
-export type GenerateResult = Pick<Playlist, "tracks" | "alternates" | "reasons" | "scores">;
+export type GenerateResult = Pick<Playlist, "tracks" | "alternates" | "reasons" | "scores"> & {
+  /** Shown to you once, e.g. when the instrument filter had to be relaxed. Not saved. */
+  note?: string;
+};
 
 export async function generatePlaylist(
   settings: PlaylistSettings,
@@ -117,8 +218,16 @@ export async function generatePlaylist(
   // Deep Cuts / Explore Further need the full pass (deep catalogue + second hop); long playlists need its bigger pool.
   const depth = settings.mode === "deep" || settings.mode === "explore" || n > 25 ? "full" : "lite";
 
-  onProgress?.(`Gathering recommendations from ${settings.seeds.map(seedName).join(", ")}…`);
-  const { candidates: all, seed, support } = await fetchPool(settings.seeds, depth);
+  const genres = settings.basis === "genre" ? genresOf(settings) : [];
+  if (settings.basis === "genre" && !genres.length) throw new Error("Pick a genre to explore.");
+  onProgress?.(genres.length ? `Finding ${genreNames(genres)} you might like…` : `Gathering recommendations from ${settings.seeds.map(seedName).join(", ")}…`);
+  const instruments = settings.instruments ?? [];
+  const [{ candidates: base, seed, support }, extraInstr] = await Promise.all([
+    genres.length ? fetchGenrePool(genres, settings.seeds, taste, depth) : fetchPool(settings.seeds, depth),
+    instruments.length ? instrumentCandidates(instruments, settings.seeds, taste, "lite") : Promise.resolve([] as Candidate[]),
+  ]);
+  const have = new Set(base.map((c) => c.key));
+  const all = [...base, ...extraInstr.filter((c) => !have.has(c.key) && (have.add(c.key), true))];
   const candidates = all.filter((c) => !(settings.skipRated && ratedKeys.has(c.key)));
   if (!candidates.length) throw new Error("Not enough recommendation data for these picks yet — try another seed or style.");
 
@@ -138,12 +247,46 @@ export async function generatePlaylist(
     ranked = [...ranked, ...rankWith(cap).filter((r) => !seen.has(r.c.key))];
   }
 
+  // Energy / instruments: re-order the best candidates by how well they fit.
+  const shape = shapeOf(settings);
+  let known: Record<string, Enrichment> = {};
+  let notes = new Map<string, string>();
+  let note: string | undefined;
+  if (shapeActive(shape)) {
+    onProgress?.("Fetching artwork and previews…");
+    // Choose from a wider list (up to 3 songs per artist), then re-apply your per-artist limit afterwards,
+    // so the energy/instrument filter has enough songs to pick from.
+    const wide = settings.perArtist >= 3 ? ranked : (() => {
+      const seen = new Set(ranked.map((r) => r.c.key));
+      return [...ranked, ...rankWith(3).filter((r) => !seen.has(r.c.key))];
+    })();
+    const shaped = await shapeRanked(wide, shape, n, onProgress);
+    known = shaped.extra;
+    notes = shaped.notes;
+    note = shaped.relaxed;
+    const perArtist = new Map<string, number>();
+    const capped: Ranked[] = [];
+    const overflow: Ranked[] = [];
+    for (const r of shaped.ranked) {
+      const a = r.c.artist.toLowerCase();
+      if ((perArtist.get(a) ?? 0) < settings.perArtist) {
+        perArtist.set(a, (perArtist.get(a) ?? 0) + 1);
+        capped.push(r);
+      } else overflow.push(r);
+    }
+    ranked = [...capped, ...overflow];
+  }
+
   // Artwork + preview availability for the songs shown now. Swap candidates get theirs when swapped in,
   // unless "previewable only" needs to check them up front.
   const spare = Math.min(n, 15); // songs kept ready for "swap"
-  const head = ranked.slice(0, settings.previewsOnly ? n * 2 + 30 : n + spare);
+  // Several genres: check more songs up front, so songs missing from Spotify (often older recordings) don't
+  // leave one genre under-represented.
+  const multi = genres.length > 1;
+  const head = ranked.slice(0, settings.previewsOnly ? n * 2 + 30 : multi ? n * 2 + spare : n + spare);
   onProgress?.("Fetching artwork and previews…");
-  const extra = await enrich((settings.previewsOnly ? head : head.slice(0, n + 8)).map((r) => r.c));
+  const toEnrich = (settings.previewsOnly ? head : head.slice(0, multi ? n * 2 + 8 : n + 8)).map((r) => r.c).filter((c) => !known[c.key]);
+  const extra = { ...known, ...(toEnrich.length ? await enrich(toEnrich) : {}) };
   const withArt = head
     .map((r) => {
       const e = extra[r.c.key] ?? {};
@@ -162,24 +305,86 @@ export async function generatePlaylist(
   const scores: Record<string, number> = {};
   for (const { r } of withArt) {
     const n = support.get(r.c.key) ?? 1;
-    reasons[r.c.key] = (n > 1 ? `Suggested by ${n} of your picks · ` : "") + explain(r);
+    const shapeNote = notes.get(r.c.key);
+    reasons[r.c.key] = (n > 1 ? (genres.length ? `Fits ${n} of your genres · ` : `Suggested by ${n} of your picks · `) : "") + explain(r) + (shapeNote ? ` · ${shapeNote}` : "");
     const ds = displayScore(r.c);
     if (ds && ds.label === "Last.fm similarity") scores[r.c.key] = ds.value;
   }
-  const items = withArt.map((x) => x.item);
+  const items = vary(multi ? takeTurns(withArt, genres) : withArt, n);
   return {
     tracks: items.slice(0, n),
     alternates: items.slice(n, n + spare),
     reasons,
     scores,
+    note,
   };
+}
+
+/**
+ * Several genres: take turns between them (each in its own ranking order), so a genre with a bigger pool, or
+ * with more songs available on Spotify, doesn't crowd out the others.
+ */
+function takeTurns<T extends { r: Ranked }>(list: T[], genres: string[]): T[] {
+  const first = (x: T) => x.r.c.genres?.[0] ?? genres[0];
+  const buckets = genres.map((g) => list.filter((x) => first(x) === g));
+  const rest = list.filter((x) => !genres.includes(first(x)));
+  const out: T[] = [];
+  for (let i = 0; buckets.some((b) => i < b.length); i++) for (const b of buckets) if (b[i]) out.push(b[i]);
+  return [...out, ...rest];
+}
+
+/** Main tag of a song: its strongest tag that isn't generic (decade, "seen live"…). */
+function mainTag(c: Candidate) {
+  let best = "", w = 0;
+  for (const [t, v] of Object.entries(c.tags)) if (v > w && !/^(\d0s|\d{4}s?|seen live|favorites?|favourites?|love|beautiful|awesome)$/.test(t)) [best, w] = [t, v];
+  return best;
+}
+
+/**
+ * Variety, keeping the ranking order otherwise:
+ * - at most one song per album (songs whose album is unknown are never blocked);
+ * - no more than 2 songs in a row with the same main tag, so the playlist doesn't feel samey.
+ * Songs pushed back by these rules are kept, after the others, as swap candidates.
+ */
+function vary(list: { r: Ranked; item: Item }[], n: number): Item[] {
+  const albums = new Set<string>();
+  const ok: { r: Ranked; item: Item }[] = [];
+  const later: { r: Ranked; item: Item }[] = [];
+  for (const x of list) {
+    const al = x.item.album ? `${x.item.artist}|${x.item.album}`.toLowerCase() : "";
+    if (al && albums.has(al)) later.push(x);
+    else {
+      if (al) albums.add(al);
+      ok.push(x);
+    }
+  }
+  // Too few songs after the album rule: let second songs from an album back in rather than come up short.
+  const pool = ok.length >= n ? ok : [...ok, ...later.splice(0, n - ok.length)];
+  const out: { r: Ranked; item: Item }[] = [];
+  const rest = [...pool];
+  while (rest.length && out.length < n) {
+    const t1 = out.length >= 2 ? mainTag(out[out.length - 1].r.c) : "";
+    const run = t1 && t1 === mainTag(out[out.length - 2].r.c);
+    // Look ahead a few places only, so a strong match is never pushed far down.
+    let i = 0;
+    if (run) {
+      const j = rest.slice(0, 6).findIndex((x) => mainTag(x.r.c) !== t1);
+      if (j > 0) i = j;
+    }
+    out.push(rest.splice(i, 1)[0]);
+  }
+  return [...out, ...rest, ...later].map((x) => x.item);
 }
 
 export function defaultName(settings: PlaylistSettings) {
   const label = modeLabel(settings.mode);
   if (settings.basis === "taste") return `${label} Mix`;
-  return `${label}: ${seedName(settings.seeds[0])}`;
+  if (settings.basis === "genre") return `${genreNames(genresOf(settings)) || "Genre"} for You`;
+  return `${label}: ${basisLabel(settings)}`;
 }
+
+/** Current time, for timestamps set in click handlers. */
+export const nowMs = () => Date.now();
 
 export function newId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);

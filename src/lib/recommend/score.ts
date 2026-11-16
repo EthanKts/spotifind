@@ -1,9 +1,11 @@
 // Pure ranking logic — runs in the browser so modes and the slider re-rank instantly.
-import type { Candidate, Kind, Seed, TagVector } from "../types";
+import type { AudioFeatures, Candidate, Kind, Seed, TagVector } from "../types";
+import { ADVENTURE, AGREEMENT_BOOST, AUDIO_FEATURES, EXTRA, MODE, TASTE_EXTRA } from "./weights";
 import { clamp, cosine, norm } from "../util";
 import { GROOVE, MOOD } from "./tags";
 
-export type Mode = "closest" | "deep" | "hidden" | "groove" | "mood" | "explore";
+import type { Mode } from "./weights";
+export type { Mode };
 
 export const MODES: { id: Mode; label: string; hint: string }[] = [
   { id: "closest", label: "Closest Match", hint: "Strongest Last.fm similarity and shared tags" },
@@ -19,6 +21,11 @@ export interface TasteInput {
   artists: Record<string, number>; // norm(artist) -> affinity; -1 = artist rated 1★ (hidden)
   loved: Set<string>; // keys rated 4–5★
   hidden: Set<string>; // keys rated 1★
+  /** Discogs style weights learned from your ratings (signed). Optional. */
+  styles?: TagVector;
+  /** Your preferred sound, learned from songs you rated well, and its confidence (0..1). Optional. */
+  audio?: AudioFeatures;
+  audioConfidence?: number;
 }
 
 export interface Ranked {
@@ -29,18 +36,25 @@ export interface Ranked {
   sharedOther: string[];
   tasteShared: string[];
   novelty: number;
+  /** Discogs styles this song shares with the seed. */
+  sharedStyles?: string[];
 }
 
-interface Weights { match: number; tag: number; groove: number; mood: number; taste: number; novelty: number }
+const BASE = MODE;
 
-const BASE: Record<Mode, Weights> = {
-  closest: { match: 0.5, tag: 0.3, groove: 0, mood: 0, taste: 0.15, novelty: 0 },
-  deep: { match: 0.3, tag: 0.25, groove: 0, mood: 0, taste: 0.15, novelty: 0.3 },
-  hidden: { match: 0.25, tag: 0.3, groove: 0, mood: 0, taste: 0.1, novelty: 0.45 },
-  groove: { match: 0.25, tag: 0.05, groove: 0.55, mood: 0, taste: 0.1, novelty: 0.05 },
-  mood: { match: 0.25, tag: 0.05, groove: 0, mood: 0.55, taste: 0.1, novelty: 0.05 },
-  explore: { match: 0.2, tag: 0.3, groove: 0, mood: 0, taste: 0.1, novelty: 0.4 },
-};
+/** 1 = identical sound, 0 = opposite. Only the features both sides have count. */
+export function audioSimilarity(a: AudioFeatures, b: AudioFeatures): number {
+  let sum = 0;
+  let wsum = 0;
+  for (const [k, w] of Object.entries(AUDIO_FEATURES) as [keyof typeof AUDIO_FEATURES, number][]) {
+    const x = k === "tempo" ? Math.min(1, a.tempo / 200) : a[k];
+    const y = k === "tempo" ? Math.min(1, b.tempo / 200) : b[k];
+    if (typeof x !== "number" || typeof y !== "number") continue;
+    sum += w * (1 - Math.abs(x - y));
+    wsum += w;
+  }
+  return wsum ? sum / wsum : 0;
+}
 
 function split(v: TagVector) {
   const pos: TagVector = {};
@@ -66,11 +80,12 @@ export function rank(
 ): Ranked[] {
   const a = clamp(adventure);
   const w = { ...BASE[mode] };
-  w.match *= 1 - 0.6 * a;
-  w.tag *= 1 - 0.3 * a;
-  w.groove *= 1 - 0.2 * a;
-  w.mood *= 1 - 0.2 * a;
-  w.novelty += 0.45 * a;
+  w.match *= 1 - ADVENTURE.match * a;
+  w.tag *= 1 - ADVENTURE.tag * a;
+  w.groove *= 1 - ADVENTURE.groove * a;
+  w.mood *= 1 - ADVENTURE.mood * a;
+  w.novelty += ADVENTURE.novelty * a;
+  const extra = EXTRA[mode];
 
   const seedTags = seed?.tags ?? {};
   const seedHasGroove = Object.keys(seedTags).some((t) => GROOVE.has(t));
@@ -136,6 +151,22 @@ export function rank(
       w.taste * (tp.score - 0.6 * tn) +
       w.novelty * nov;
 
+    // New data (Discogs styles, measured audio, ListenBrainz agreement) only counts when present on both sides.
+    let sharedStyles: string[] | undefined;
+    if (seed?.styles && c.styles && Object.keys(seed.styles).length && Object.keys(c.styles).length) {
+      const st = cosine(seed.styles, c.styles);
+      s += extra.style * st.score;
+      sharedStyles = st.shared.slice(0, 3);
+    }
+    if (seed?.audio && c.audio) s += extra.audio * audioSimilarity(seed.audio, c.audio);
+    if (c.lbMatch != null && (c.match != null || c.artistMatch != null)) s += AGREEMENT_BOOST * Math.min(1, c.lbMatch * 2);
+    // Your taste, from the new sources: styles you rate well, and your preferred sound (by confidence).
+    if (taste.styles && c.styles && Object.keys(taste.styles).length) {
+      const { pos: sp, neg: sn } = split(taste.styles);
+      s += TASTE_EXTRA.style * (cosine(sp, c.styles).score - 0.6 * (Object.keys(sn).length ? cosine(sn, c.styles).score : 0));
+    }
+    if (taste.audio && c.audio) s += TASTE_EXTRA.audio * (taste.audioConfidence ?? 0) * audioSimilarity(taste.audio, c.audio);
+
     if (c.hop === 2) s -= 0.12 * (1 - a);
     if (c.sameArtistAsSeed) s -= 0.05 + 0.25 * a;
     if (aff > 0) s += 0.04 * Math.min(aff, 3);
@@ -153,6 +184,7 @@ export function rank(
       sharedOther: all.shared.filter((t) => !used.has(t)).slice(0, 2),
       tasteShared: tp.shared.slice(0, 2),
       novelty: nov,
+      sharedStyles,
     });
   }
 

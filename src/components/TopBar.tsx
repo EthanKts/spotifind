@@ -22,9 +22,11 @@ export function TopBar() {
     setQ(urlQ);
   }
 
+  // ⌘K opens the command palette (CommandPalette.tsx); "/" focuses this search box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      const t = e.target as HTMLElement | null;
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable))) {
         e.preventDefault();
         inputRef.current?.focus();
       }

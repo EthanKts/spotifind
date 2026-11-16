@@ -1,19 +1,21 @@
 "use client";
 
+import { genreNames, resolveGenre } from "@/lib/recommend/genres";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Heart, ListMusic, Loader2, Search, Star, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ListMusic, Loader2, Star, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Kind } from "@/lib/types";
 import { MODES, type Mode, type TasteInput } from "@/lib/recommend/score";
 import { taste, useProfile, useTasteInput, type PlaylistSettings, type Profile } from "@/lib/taste/profile";
 import { useImported } from "@/lib/taste/imported";
-import { modeLabel, newId, seedName, tasteSeeds } from "@/lib/client/playlist";
+import { basisLabel, modeLabel, newId, seedName, tasteSeeds } from "@/lib/client/playlist";
 import { RapidQueue, type RapidCard } from "@/lib/client/rapid";
 import { player, usePlayer } from "@/lib/client/player";
 import { Artwork } from "@/components/Artwork";
+import { sizedImage } from "@/lib/img";
 import { ArtistLine } from "@/components/Actions";
-import { SeedSearch } from "../playlists/PlaylistsView";
+import { BasisPicker, ShapeControls, type Basis, type Picked } from "@/components/BuildControls";
 import { PageHeader } from "@/components/Cards";
 import { norm } from "@/lib/util";
 
@@ -47,12 +49,19 @@ export function RapidView() {
   const preArtist = sp.get("artist");
   const prefill = preKind && preArtist ? { kind: preKind, artist: preArtist, title: sp.get("title") ?? preArtist } : null;
 
-  const [basisChoice, setBasis] = useState<"taste" | "seed" | null>(prefill ? "seed" : null);
-  const basis = basisChoice ?? (mySeeds.length ? "taste" : "seed");
-  const [seed, setSeed] = useState<{ s: SeedT; image?: string } | null>(prefill ? { s: prefill } : null);
+  const preGenre = sp.get("genre");
+  const [basisChoice, setBasis] = useState<Basis | null>(preGenre ? "genre" : prefill ? "seed" : null);
+  const basis: Basis = basisChoice ?? (mySeeds.length ? "taste" : "seed");
+  const [picked, setPicked] = useState<Picked[]>(prefill ? [{ s: prefill }] : []);
+  // ?genre= takes subgenre ids or names, several separated by "|".
+  const [genres, setGenres] = useState<string[]>(() => (preGenre ? [...new Set(preGenre.split("|").filter(Boolean).map((g) => resolveGenre(g).id))].slice(0, 5) : []));
+  const [energy, setEnergy] = useState<number | null>(null);
+  const [instruments, setInstruments] = useState<string[]>([]);
   const [mode, setMode] = useState<Mode>((sp.get("mode") as Mode) || "closest");
   const [adventure, setAdventure] = useState(Number(sp.get("adventure") ?? 0.3));
-  const seeds = basis === "taste" ? mySeeds : seed ? [seed.s] : [];
+  // For a genre, your favourites are the bridge into it.
+  const seeds = basis === "seed" ? picked.map((x) => x.s) : mySeeds;
+  const ready = basis === "genre" ? genres.length > 0 : seeds.length > 0;
   const pct = Math.round(adventure * 100);
 
   // ------------------------------------------------------------------ session
@@ -65,7 +74,18 @@ export function RapidView() {
   const [rated, setRated] = useState<Record<string, { card: RapidCard; stars: number }>>({});
   const [skippedKeys, setSkippedKeys] = useState<Set<string>>(new Set());
   const [flash, setFlash] = useState<string | null>(null);
-  const [session, setSession] = useState<{ seeds: SeedT[]; label: string; mode: Mode; adventure: number; knownArtists: Set<string> } | null>(null);
+  const [relaxed, setRelaxed] = useState<string | null>(null);
+  const [session, setSession] = useState<{
+    seeds: SeedT[];
+    label: string;
+    basis: Basis;
+    genres?: string[];
+    energy: number | null;
+    instruments: string[];
+    mode: Mode;
+    adventure: number;
+    knownArtists: Set<string>;
+  } | null>(null);
 
   const queue = useRef<RapidQueue | null>(null);
   const tasteRef = useRef<TasteInput>(tasteInput);
@@ -88,35 +108,43 @@ export function RapidView() {
       if (queue.current !== q) return; // a newer session started
       if (!more.length) setExhausted(true);
       else setCards((c) => [...c, ...more]);
+      setRelaxed(q.relaxedNote);
     } finally {
       if (queue.current === q) setFetching(false);
     }
   }, [known]);
 
   async function start() {
-    if (!seeds.length) return;
+    if (!ready) return;
     setError(null);
     setPhase("loading");
-    const q = new RapidQueue({ seeds, mode, adventure });
+    const g = basis === "genre" ? genres : undefined;
+    const q = new RapidQueue({ seeds, mode, adventure, genres: g, shape: { energy, instruments } });
     queue.current = q;
     setCards([]);
     setIndex(0);
     setRated({});
     setSkippedKeys(new Set());
     setExhausted(false);
+    setRelaxed(null);
     setSession({
       seeds,
-      label: basis === "taste" ? "your taste" : seedName(seeds[0]),
+      label: basisLabel({ basis, seeds, genres: g }),
+      basis,
+      genres: g,
+      energy,
+      instruments,
       mode,
       adventure,
       knownArtists: new Set([...Object.values(p.ratings).map((r) => norm(r.item.artist)), ...imp.items.map((x) => norm(x.artist))]),
     });
     try {
-      await q.start();
+      await q.start(tasteRef.current);
       const first = await q.next(BATCH, tasteRef.current, known());
       if (queue.current !== q) return;
       if (!first.length) throw new Error("No previewable songs found for this seed and style — try another style or seed.");
       setCards(first);
+      setRelaxed(q.relaxedNote);
       setPhase("rating");
     } catch (e) {
       setError((e as Error).message);
@@ -261,11 +289,14 @@ export function RapidView() {
     const id = newId();
     taste.savePlaylist({
       id,
-      name: `Rapid-fire: ${session.label === "your taste" ? "My picks" : session.label}`,
+      name: `Rapid-fire: ${session.basis === "taste" ? "My picks" : session.label}`,
       createdAt: Date.now(),
       settings: {
-        basis: session.label === "your taste" ? "taste" : "seed",
+        basis: session.basis,
         seeds: session.seeds,
+        genres: session.genres,
+        energy: session.energy,
+        instruments: session.instruments,
         mode: session.mode,
         adventure: session.adventure,
         perArtist: 2,
@@ -290,50 +321,16 @@ export function RapidView() {
       <div>
         {header}
         <section className="panel mx-4 grid gap-6 p-5 md:mx-8" aria-label="Rapid-fire settings">
-          <div>
-            <h2 className="label">Based on</h2>
-            <div className="mt-2 grid gap-3 md:grid-cols-2">
-              <button
-                onClick={() => setBasis("taste")}
-                disabled={!mySeeds.length}
-                data-on={basis === "taste"}
-                className="option p-3.5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <span className="flex items-center gap-2 text-sm font-medium">
-                  <Heart className="size-4 text-sub" /> From my taste
-                </span>
-                <span className="mt-1 block text-sm text-sub">
-                  {mySeeds.length ? `Blends ${mySeeds.map(seedName).join(", ")}` : "Rate a few songs or artists 4–5★ first, or import your taste from Spotify on My Ratings."}
-                </span>
-              </button>
-              <div data-on={basis === "seed"} className="option p-3.5 hover:bg-base">
-                <button onClick={() => setBasis("seed")} className="flex w-full items-center gap-2 text-left text-sm font-medium">
-                  <Search className="size-4 text-sub" /> A song, album or artist
-                </button>
-                {basis === "seed" &&
-                  (seed ? (
-                    <div className="mt-2 flex items-center gap-3 rounded-md border border-line bg-elev p-2">
-                      <Artwork src={seed.image} alt={seedName(seed.s)} kind={seed.s.kind} className="size-10 shrink-0" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{seedName(seed.s)}</span>
-                        <span className="block truncate text-xs capitalize text-sub">
-                          {seed.s.kind === "track" ? "Song" : seed.s.kind}
-                          {seed.s.kind !== "artist" && ` · ${seed.s.artist}`}
-                        </span>
-                      </span>
-                      <button onClick={() => setSeed(null)} aria-label="Change seed" className="rounded-full p-1.5 text-sub hover:bg-hl hover:text-ink">
-                        <X className="size-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="mt-2">
-                      <SeedSearch onPick={(s, image) => setSeed({ s, image })} />
-                    </div>
-                  ))}
-                {basis !== "seed" && <p className="mt-1 text-sm text-sub">Start from one thing you love.</p>}
-              </div>
-            </div>
-          </div>
+          <BasisPicker
+            basis={basis}
+            setBasis={setBasis}
+            mySeeds={mySeeds}
+            picked={picked}
+            setPicked={setPicked}
+            genres={genres}
+            setGenres={setGenres}
+            tasteTags={tasteInput.tags}
+          />
 
           <div>
             <h2 className="label">Style</h2>
@@ -367,24 +364,29 @@ export function RapidView() {
                 value={pct}
                 onChange={(e) => setAdventure(Number(e.target.value) / 100)}
                 aria-label="Adventurousness"
+                title="Left: songs closest to what you picked. Right: further away, with artists you probably don’t know yet."
                 className="sf-range always-thumb mt-2 w-full"
                 style={{ ["--range-pct" as string]: `${pct}%`, ["--range-fill" as string]: "var(--color-find)" }}
               />
             </label>
           </div>
 
+          <ShapeControls energy={energy} setEnergy={setEnergy} instruments={instruments} setInstruments={setInstruments} />
+
           <div className="flex flex-wrap items-center gap-4">
             <button
               onClick={start}
-              disabled={!seeds.length || phase === "loading"}
+              disabled={!ready || phase === "loading"}
               className="btn btn-primary btn-lg"
             >
               {phase === "loading" ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
-              {phase === "loading" ? "Lining up songs…" : "Start"}
+              {phase === "loading" ? (energy != null ? "Measuring energy…" : "Lining up songs…") : "Start"}
             </button>
-            {seeds.length > 0 && phase !== "loading" && (
+            {ready && phase !== "loading" && (
               <p className="text-sm text-sub">
-                {modeLabel(mode)} · from {seeds.map(seedName).join(", ")} · skips songs you’ve rated or that have no preview
+                {modeLabel(mode)} · from {basis === "genre" ? `${genreNames(genres)}, matched to your taste` : seeds.map(seedName).join(", ")}
+                {energy != null && ` · energy ${Math.round(energy * 100)}`}
+                {instruments.length > 0 && ` · ${instruments.length} instrument${instruments.length > 1 ? "s" : ""}`}
               </p>
             )}
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -462,7 +464,6 @@ export function RapidView() {
   // ------------------------------------------------------------------ rating
   const it = current?.item;
   const myStars = it ? (rated[it.key]?.stars ?? p.ratings[it.key]?.rating ?? 0) : 0;
-  const next = cards[index + 1]?.item;
   return (
     <div className="flex min-h-full flex-col">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 md:px-8">
@@ -488,7 +489,7 @@ export function RapidView() {
         </div>
       ) : (
         <div key={it.key} className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center px-4 pb-6 pt-4 text-center animate-fade-in">
-          <Artwork src={it.image} alt={`${it.title} by ${it.artist}`} kind="track" className="aspect-square w-full max-w-[min(340px,36vh)]" />
+          <Artwork src={it.image} alt={`${it.title} by ${it.artist}`} kind="track" priority className="aspect-square w-full max-w-[min(340px,36vh)]" />
           <h2 className="mt-5 line-clamp-2 text-2xl font-semibold tracking-tight">{it.title}</h2>
           <div className="mt-1 flex max-w-full justify-center text-[16px] text-sub">
             <ArtistLine name={it.artist} />
@@ -499,6 +500,7 @@ export function RapidView() {
             )}
             {current!.reason}
           </p>
+          {relaxed && <p className="mt-1 text-xs text-mute">{relaxed}</p>}
           {ps.item?.key === it.key && ps.status === "unavailable" && <p className="mt-1 text-xs text-danger">Preview didn’t load — press → to skip.</p>}
 
           <div className="mt-5 flex items-center gap-1" role="radiogroup" aria-label={`Rate ${it.title}`}>
@@ -551,10 +553,12 @@ export function RapidView() {
               <Kbd>Esc</Kbd> finish
             </span>
           </div>
-          {next?.image && (
-            // Warm the next cover so it appears instantly.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={next.image} alt="" className="hidden" aria-hidden />
+          {/* Warm the next three covers (at the size shown) so each appears instantly. */}
+          {cards.slice(index + 1, index + 4).map((c) =>
+            c.item.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={c.item.key} src={sizedImage(c.item.image, 720)} alt="" className="hidden" aria-hidden />
+            ) : null,
           )}
         </div>
       )}

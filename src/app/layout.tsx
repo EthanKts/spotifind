@@ -7,6 +7,7 @@ import { TopBar } from "@/components/TopBar";
 import { Player } from "@/components/Player";
 import { KeyBanner } from "@/components/KeyBanner";
 import { Welcome } from "@/components/Welcome";
+import { CommandPalette } from "@/components/CommandPalette";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </Suspense>
         </div>
         <Welcome />
+        <CommandPalette />
       </body>
     </html>
   );

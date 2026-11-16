@@ -9,11 +9,11 @@ import type { SearchResponse } from "../api/search/route";
 import { useJson } from "@/lib/client/data";
 import { taste, useProfile } from "@/lib/taste/profile";
 import { Artwork } from "@/components/Artwork";
-import { PageHeader, MediaCard, Shelf, ShelfItem, TrackRow } from "@/components/Cards";
+import { PageHeader, MediaCard, Shelf, ShelfItem, TrackRow, ErrorState } from "@/components/Cards";
 import { discoverHref, OpenInSpotify, PlayButton } from "@/components/Actions";
 import { hrefFor } from "@/lib/util";
 
-const BROWSE: { tag: string; color: string }[] = [
+export const BROWSE: { tag: string; color: string }[] = [
   { tag: "Jazz Fusion", color: "#8d67ab" },
   { tag: "Funk", color: "#e8115b" },
   { tag: "Neo-Soul", color: "#ba5d07" },
@@ -128,7 +128,7 @@ export function SearchView() {
           <Loader2 className="size-4 animate-spin" /> Searching…
         </p>
       )}
-      {error && <p className="px-4 text-danger md:px-8">Search failed: {error}</p>}
+      {error && <ErrorState title="Search didn’t work" message={error} />}
       {data?.note && (
         <p className="panel mx-4 mb-4 flex items-center gap-2 px-3 py-2 text-sm text-sub md:mx-8">
           <Link2 className="size-4 shrink-0 text-sub" /> {data.note}
